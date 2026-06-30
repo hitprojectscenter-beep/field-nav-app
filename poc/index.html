@@ -233,6 +233,38 @@
     }
     .poi-pop a { color:var(--accent); font-size:11.5px; }
     .poi-route-btn { border:none; background:var(--accent); color:#fff; border-radius:8px; padding:6px 10px; margin-top:8px; cursor:pointer; font-family:inherit; font-weight:700; font-size:12px; }
+
+    /* === פקדים חדשים: ערימת מידע, סרגל כלים, מיקום חי, מדידה === */
+    .info-stack { position:absolute; top:70px; left:50%; transform:translateX(-50%); z-index:6;
+      display:flex; flex-direction:column; align-items:center; gap:8px; max-width:92vw; pointer-events:none; }
+    .info-stack > * { pointer-events:auto; }
+    .info-stack .hint, .info-stack .chip { position:static; transform:none; }
+    .chip { display:none; align-items:center; gap:10px; background:var(--panel); backdrop-filter:var(--panel-blur);
+      padding:8px 8px 8px 14px; border-radius:14px; box-shadow:var(--shadow); color:var(--text); font-weight:700; font-size:13px; border-right:4px solid var(--accent); }
+    .chip-x { border:none; background:rgba(128,128,128,.16); color:var(--text); border-radius:9px; width:26px; height:26px; cursor:pointer; font-size:13px; flex:0 0 26px; }
+    .route-chip { border-right-color:#c2682a; }
+    .nav-chip { border-right-color:#2e9e3f; }
+    .measure-chip { border-right-color:#1f6fd1; }
+
+    .tool-dock { position:absolute; top:138px; right:14px; z-index:5;
+      display:flex; flex-direction:column; gap:6px; background:var(--panel); backdrop-filter:var(--panel-blur);
+      padding:8px; border-radius:20px; box-shadow:var(--shadow); }
+    .tool-btn { width:46px; height:46px; border:none; cursor:pointer; background:transparent; color:var(--text);
+      border-radius:14px; font-size:20px; display:grid; place-items:center; transition:transform .12s, background .2s; }
+    .tool-btn:hover { transform:translateY(-2px); background:rgba(128,128,128,.12); }
+    .tool-btn:active { transform:scale(.92); }
+    .tool-btn.on { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; box-shadow:0 4px 12px rgba(194,104,42,.40); }
+    /* ליטוש: מצב פעיל אחיד לכפתורי הסרגל העליון */
+    .icon-btn.active { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; }
+
+    /* מיקום חי "הצג אותי" */
+    .me-dot { width:22px; height:22px; position:relative; }
+    .me-dot .me-core { position:absolute; inset:5px; background:#1f6fd1; border:2px solid #fff; border-radius:50%; box-shadow:0 0 0 2px rgba(31,111,209,.4); z-index:2; }
+    .me-dot .me-pulse { position:absolute; inset:0; border-radius:50%; background:rgba(31,111,209,.35); animation:mePulse 2s ease-out infinite; }
+    @keyframes mePulse { 0%{transform:scale(.5);opacity:.85} 100%{transform:scale(2.3);opacity:0} }
+    .measure-vertex { width:12px; height:12px; background:#fff; border:3px solid #1f6fd1; border-radius:50%; box-shadow:0 1px 4px rgba(0,0,0,.4); }
+    .copy-coord, .nav-here { border:none; color:#fff; border-radius:8px; padding:6px 10px; margin-top:8px; cursor:pointer; font-family:inherit; font-weight:700; font-size:12px; background:var(--accent); }
+    .nav-here { background:var(--accent-2); }
   </style>
 </head>
 <body data-theme="day">
@@ -254,10 +286,24 @@
     </div>
   </div>
 
-  <!-- R2: צ'יפ מסלול + רמז שימוש -->
-  <div class="route-chip" id="routeInfo"><span></span><button id="clearRouteBtn" title="נקה מסלול">✕</button></div>
-  <div class="hint" id="hint">👆 הקישו על המפה לבחירת יעד · 🏞️ נקודות עניין</div>
+  <!-- ערימת מידע עליונה: רמז, מסלול, ניווט אווירי, מדידה -->
+  <div class="info-stack">
+    <div class="hint" id="hint">בחרו כלי מהסרגל ◀ · או 🏞️ לנקודות עניין</div>
+    <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="clearRouteBtn" title="נקה מסלול">✕</button></div>
+    <div class="chip nav-chip" id="navInfo"><span></span><button class="chip-x" id="cancelNavBtn" title="בטל ניווט">✕</button></div>
+    <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="clearMeasureBtn" title="נקה מדידה">✕</button></div>
+  </div>
   <div class="poi-status" id="poiStatus"></div>
+
+  <!-- סרגל כלים (ימין): הצג אותי, ניווט אווירי, מסלול שטח, מדידות, נקודה -->
+  <div class="tool-dock">
+    <button class="tool-btn" id="showMeBtn" title="הצג אותי על המפה (GPS חי)">📍</button>
+    <button class="tool-btn" data-tool="bearing" title="נווט ליעד — קרן אווירית קבועה">🎯</button>
+    <button class="tool-btn" data-tool="route" title="מסלול שטח ליעד">🚙</button>
+    <button class="tool-btn" data-tool="distance" title="מדידת מרחק">📏</button>
+    <button class="tool-btn" data-tool="area" title="מדידת שטח">⬛</button>
+    <button class="tool-btn" data-tool="point" title="סמן נקודה + קואורדינטות">📌</button>
+  </div>
 
   <!-- חץ צפון: ה'מחט' מסתובבת כך שתמיד מצביעה לצפון גם כשהמפה מסתובבת בתנועה -->
   <div class="north" id="north" title="צפון — לחץ ליישור צפונה">
@@ -267,8 +313,6 @@
 
   <div class="layers" id="layers"></div>
   <div class="legend" id="legend"></div>
-
-  <button class="locate" id="locateBtn" title="המיקום שלי">📍</button>
 
   <details class="credits" open>
     <summary>ℹ️ מקורות וקרדיטים</summary>
@@ -327,17 +371,28 @@
 
     function styleFor(key) {
       const L = LAYERS[key];
+      const empty = { type: "FeatureCollection", features: [] };
       return {
         version: 8,
         sources: {
-          base: { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
-          route: { type: "geojson", data: { type: "FeatureCollection", features: [] } }
+          base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
+          route:   { type: "geojson", data: empty },
+          nav:     { type: "geojson", data: empty },
+          measure: { type: "geojson", data: empty }
         },
         layers: [
           { id: "base", type: "raster", source: "base" },
+          { id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"],
+            paint: { "fill-color": "#1f6fd1", "fill-opacity": 0.18 } },
           { id: "route-line", type: "line", source: "route",
             layout: { "line-cap": "round", "line-join": "round" },
-            paint: { "line-color": "#c2682a", "line-width": 5, "line-opacity": 0.92 } }
+            paint: { "line-color": "#c2682a", "line-width": 5, "line-opacity": 0.92 } },
+          { id: "measure-line", type: "line", source: "measure",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "#1f6fd1", "line-width": 3, "line-dasharray": [2, 1.5] } },
+          { id: "nav-line", type: "line", source: "nav",
+            layout: { "line-cap": "round" },
+            paint: { "line-color": "#2e9e3f", "line-width": 4, "line-dasharray": [1.6, 1.2] } }
         ]
       };
     }
@@ -567,7 +622,124 @@
     function clearRoute(){ if(destMarker){destMarker.remove();destMarker=null;} destPoint=null; lastRouteData={type:"FeatureCollection",features:[]}; if(map.getSource('route')) map.getSource('route').setData(lastRouteData); setRouteInfo('',false); const h=document.getElementById('hint'); if(h) h.style.display='block'; }
 
     // הקשה על אזור פנוי במפה = בחירת יעד
-    map.on('click', e=>setDestination([e.lngLat.lng,e.lngLat.lat]));
+    // ====== מערכת כלים: הצג-אותי, קרן אווירית, מסלול שטח, מדידות, נקודה ======
+    const EMPTY = { type:"FeatureCollection", features:[] };
+    const toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
+    function haversine(a,b){ const R=6371000, dLat=toRad(b[1]-a[1]), dLng=toRad(b[0]-a[0]);
+      const s=Math.sin(dLat/2)**2+Math.cos(toRad(a[1]))*Math.cos(toRad(b[1]))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(s)); }
+    function bearingDeg(a,b){ const y=Math.sin(toRad(b[0]-a[0]))*Math.cos(toRad(b[1]));
+      const x=Math.cos(toRad(a[1]))*Math.sin(toRad(b[1]))-Math.sin(toRad(a[1]))*Math.cos(toRad(b[1]))*Math.cos(toRad(b[0]-a[0]));
+      return (toDeg(Math.atan2(y,x))+360)%360; }
+    function geoArea(c){ const R=6378137; let a=0; const n=c.length; if(n<3) return 0;
+      for(let i=0;i<n;i++){ const p1=c[i],p2=c[(i+1)%n]; a+=toRad(p2[0]-p1[0])*(2+Math.sin(toRad(p1[1]))+Math.sin(toRad(p2[1]))); }
+      return Math.abs(a*R*R/2); }
+    function fmtDist(m){ return m>=1000?(m/1000).toFixed(2)+' ק"מ':Math.round(m)+' מ׳'; }
+    function fmtArea(m2){ if(m2<10000) return `${Math.round(m2)} מ"ר (${(m2/1000).toFixed(2)} דונם)`;
+      if(m2<1e6) return `${(m2/1000).toFixed(1)} דונם`; return `${(m2/1e6).toFixed(2)} קמ"ר`; }
+    function chipSet(id,t,show){ const e=document.getElementById(id); if(!e) return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; }
+    const setNavInfo=(t,show=true)=>chipSet('navInfo',t,show);
+    const setMeasureInfo=(t,show=true)=>chipSet('measureInfo',t,show);
+
+    // --- הצג אותי (GPS חי) ---
+    let myPos=null, myMarker=null, showMeWatch=null, firstFix=true;
+    function startShowMe(){
+      if(!navigator.geolocation) return alert('אין תמיכה ב-GPS בדפדפן');
+      firstFix=true; document.getElementById('showMeBtn').classList.add('on');
+      showMeWatch=navigator.geolocation.watchPosition(p=>{
+        myPos=[p.coords.longitude,p.coords.latitude]; startPoint=myPos;
+        if(!myMarker){ const el=document.createElement('div'); el.className='me-dot'; el.innerHTML='<div class="me-pulse"></div><div class="me-core"></div>'; myMarker=new maplibregl.Marker({element:el}).setLngLat(myPos).addTo(map); }
+        else myMarker.setLngLat(myPos);
+        if(firstFix){ map.easeTo({center:myPos, zoom:Math.max(map.getZoom(),14)}); firstFix=false; }
+        updateBearing();
+      }, e=>{ alert('שגיאת GPS: '+e.message); stopShowMe(); }, {enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+    }
+    function stopShowMe(){ if(showMeWatch!=null){navigator.geolocation.clearWatch(showMeWatch);showMeWatch=null;} if(myMarker){myMarker.remove();myMarker=null;} document.getElementById('showMeBtn').classList.remove('on'); }
+    document.getElementById('showMeBtn').onclick=()=>{ showMeWatch===null?startShowMe():stopShowMe(); };
+
+    // --- ניווט אווירי: קרן קבועה ממיקומי ליעד ---
+    let navTarget=null, navMarker=null;
+    function setNavTarget(ll){
+      navTarget=ll;
+      if(navMarker) navMarker.remove();
+      const el=document.createElement('div'); el.textContent='🎯'; el.style.cssText='font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+      navMarker=new maplibregl.Marker({element:el}).setLngLat(ll).addTo(map);
+      if(!myPos && showMeWatch===null) startShowMe();   // צריך מיקום כדי לצייר קרן
+      updateBearing();
+    }
+    function updateBearing(){
+      const s=map.getSource('nav');
+      if(navTarget && myPos){
+        if(s) s.setData({type:'Feature',geometry:{type:'LineString',coordinates:[myPos,navTarget]}});
+        const d=haversine(myPos,navTarget), b=bearingDeg(myPos,navTarget);
+        setNavInfo(d<25 ? '🎉 הגעת ליעד!' : `🎯 קו אווירי · ${fmtDist(d)} · אזימוט ${Math.round(b)}°`);
+      } else if(navTarget){ setNavInfo('🎯 ממתין למיקום GPS — הופעל "הצג אותי"'); }
+    }
+    function cancelNav(){ navTarget=null; if(navMarker){navMarker.remove();navMarker=null;} const s=map.getSource('nav'); if(s)s.setData(EMPTY); setNavInfo('',false); }
+    document.getElementById('cancelNavBtn').onclick=cancelNav;
+
+    // --- מדידת מרחק / שטח ---
+    let measurePts=[], measureMarkers=[], measureMode=null;
+    function addMeasurePoint(ll){
+      measurePts.push(ll);
+      const el=document.createElement('div'); el.className='measure-vertex';
+      measureMarkers.push(new maplibregl.Marker({element:el}).setLngLat(ll).addTo(map));
+      updateMeasure();
+    }
+    function updateMeasure(){
+      const s=map.getSource('measure');
+      if(measureMode==='distance'){
+        if(s) s.setData(measurePts.length>1?{type:'Feature',geometry:{type:'LineString',coordinates:measurePts}}:EMPTY);
+        let d=0; for(let i=1;i<measurePts.length;i++) d+=haversine(measurePts[i-1],measurePts[i]);
+        setMeasureInfo(`📏 מרחק: ${fmtDist(d)} · ${measurePts.length} נק׳`);
+      } else {
+        const ring=measurePts.length>2?[[...measurePts,measurePts[0]]]:null;
+        if(s) s.setData(ring?{type:'Feature',geometry:{type:'Polygon',coordinates:ring}}:(measurePts.length>1?{type:'Feature',geometry:{type:'LineString',coordinates:measurePts}}:EMPTY));
+        let per=0; for(let i=1;i<measurePts.length;i++) per+=haversine(measurePts[i-1],measurePts[i]);
+        if(measurePts.length>2) per+=haversine(measurePts[measurePts.length-1],measurePts[0]);
+        setMeasureInfo(measurePts.length>2?`⬛ שטח: ${fmtArea(geoArea(measurePts))} · היקף ${fmtDist(per)}`:`⬛ הקישו עוד נקודות (${measurePts.length}/3)`);
+      }
+    }
+    function clearMeasure(){ measurePts=[]; measureMarkers.forEach(m=>m.remove()); measureMarkers=[]; const s=map.getSource('measure'); if(s)s.setData(EMPTY); setMeasureInfo('',false); }
+    document.getElementById('clearMeasureBtn').onclick=clearMeasure;
+
+    // --- סימון נקודה + קואורדינטות ---
+    let pointMarkers=[];
+    function dropPoint(ll){
+      const lat=ll[1].toFixed(5), lng=ll[0].toFixed(5);
+      const el=document.createElement('div'); el.textContent='📌'; el.style.cssText='font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+      const html=`<div class="poi-pop"><b>נקודה מסומנת</b><span>קו רוחב: ${lat}<br>קו אורך: ${lng}</span><br><button class="copy-coord" data-c="${lat}, ${lng}">📋 העתק</button> <button class="nav-here" data-lng="${ll[0]}" data-lat="${ll[1]}">🎯 נווט</button></div>`;
+      const popup=new maplibregl.Popup({offset:18}).setHTML(html);
+      const mk=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(ll).setPopup(popup).addTo(map);
+      pointMarkers.push(mk); mk.togglePopup();
+      popup.on('open',()=>{ const c=document.querySelector('.copy-coord'); if(c)c.onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(c.dataset.c); c.textContent='הועתק ✓'; };
+        const nh=document.querySelector('.nav-here'); if(nh)nh.onclick=()=>{ setActiveTool('bearing'); setNavTarget([+nh.dataset.lng,+nh.dataset.lat]); popup.remove(); }; });
+    }
+
+    // --- בורר כלים פעיל ---
+    let activeTool=null;
+    const TOOL_HINT={ bearing:'🎯 הקישו על היעד — תיווצר קרן אווירית קבועה ממיקומכם', route:'🚙 הקישו על היעד לחישוב מסלול שטח', distance:'📏 הקישו נקודות ברצף למדידת מרחק', area:'⬛ הקישו לפחות 3 נקודות לתיחום שטח', point:'📌 הקישו לסימון נקודה והצגת קואורדינטות' };
+    function setActiveTool(t){
+      if(activeTool===t) t=null;
+      activeTool=t;
+      document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('on', b.dataset.tool===t));
+      try{ map.getCanvas().style.cursor = t?'crosshair':''; }catch(_){}
+      const h=document.getElementById('hint');
+      if(t){ h.textContent=TOOL_HINT[t]; h.style.display='block'; } else { h.style.display='none'; }
+      if(t==='distance'||t==='area'){ clearMeasure(); measureMode=t; }
+    }
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b=> b.onclick=()=>setActiveTool(b.dataset.tool));
+
+    // --- שיגור הקשה לפי הכלי הפעיל ---
+    map.on('click', e=>{
+      const ll=[e.lngLat.lng, e.lngLat.lat];
+      switch(activeTool){
+        case 'bearing':  setNavTarget(ll); break;
+        case 'route':    setDestination(ll); break;
+        case 'distance':
+        case 'area':     addMeasurePoint(ll); break;
+        case 'point':    dropPoint(ll); break;
+      }
+    });
     map.on('moveend', schedulePois);
     map.on('load', loadPois);
 
@@ -575,14 +747,6 @@
       if(poiOn) loadPois(); else { poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; setPoiStatus(''); } };
     document.getElementById('clearRouteBtn').onclick=clearRoute;
 
-    // ===== כפתור מיקום (R1) =====
-    document.getElementById("locateBtn").onclick = () => {
-      if (!navigator.geolocation) return alert("אין תמיכה באיתור מיקום");
-      navigator.geolocation.getCurrentPosition(
-        pos => { startPoint = [pos.coords.longitude, pos.coords.latitude]; map.flyTo({ center: startPoint, zoom:14 }); },
-        () => alert("לא הצלחנו לאתר מיקום (בדפדפן/הרשאות)")
-      );
-    };
 
     // ===== מצב יום/לילה =====
     document.getElementById("themeBtn").onclick = (e) => {
