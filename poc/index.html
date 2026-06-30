@@ -213,6 +213,26 @@
     .chat-input button { border:none; background:var(--accent); color:#fff; border-radius:11px; padding:0 16px; cursor:pointer; font-weight:700; font-family:inherit; }
     .member-dot { width:34px; height:34px; border-radius:50%; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.35); display:grid; place-items:center; font-size:17px; color:#fff; position:relative; }
     .member-dot .nm { position:absolute; top:34px; font-size:10px; font-weight:800; background:rgba(0,0,0,.6); color:#fff; padding:1px 5px; border-radius:6px; white-space:nowrap; }
+
+    /* R2/R3 — צ'יפ מסלול, רמז, סטטוס נקודות עניין */
+    .route-chip {
+      position:absolute; top:74px; left:50%; transform:translateX(-50%); z-index:6;
+      display:none; align-items:center; gap:10px; background:var(--panel); backdrop-filter:var(--panel-blur);
+      padding:8px 8px 8px 14px; border-radius:14px; box-shadow:var(--shadow); color:var(--text); font-weight:700; font-size:13px;
+    }
+    .route-chip button { border:none; background:rgba(128,128,128,.18); color:var(--text); border-radius:9px; width:26px; height:26px; cursor:pointer; font-size:13px; }
+    .hint {
+      position:absolute; top:74px; left:50%; transform:translateX(-50%); z-index:5;
+      background:var(--panel); backdrop-filter:var(--panel-blur); padding:7px 14px; border-radius:14px; box-shadow:var(--shadow);
+      color:var(--muted); font-size:12.5px; font-weight:600; white-space:nowrap; pointer-events:none;
+    }
+    .poi-status {
+      position:absolute; bottom:78px; left:50%; transform:translateX(-50%); z-index:5; display:none;
+      background:var(--panel); backdrop-filter:var(--panel-blur); padding:5px 12px; border-radius:12px; box-shadow:var(--shadow);
+      color:var(--muted); font-size:12px; font-weight:600;
+    }
+    .poi-pop a { color:var(--accent); font-size:11.5px; }
+    .poi-route-btn { border:none; background:var(--accent); color:#fff; border-radius:8px; padding:6px 10px; margin-top:8px; cursor:pointer; font-family:inherit; font-weight:700; font-size:12px; }
   </style>
 </head>
 <body data-theme="day">
@@ -226,12 +246,18 @@
     <div class="top-actions">
       <button class="icon-btn account-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
       <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
+      <button class="icon-btn active" id="poiBtn" title="נקודות עניין: עתיקות, מעיינות, מערות, תצפיות, קפה">🏞️</button>
       <a class="icon-btn" href="route-planner.html" title="תכנון מסלול חי + עצירות" style="text-decoration:none">🛣️</a>
       <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
       <button class="icon-btn" id="headingBtn" title="סימולציית תנועה (heading-up)">🚗</button>
       <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
     </div>
   </div>
+
+  <!-- R2: צ'יפ מסלול + רמז שימוש -->
+  <div class="route-chip" id="routeInfo"><span></span><button id="clearRouteBtn" title="נקה מסלול">✕</button></div>
+  <div class="hint" id="hint">👆 הקישו על המפה לבחירת יעד · 🏞️ נקודות עניין</div>
+  <div class="poi-status" id="poiStatus"></div>
 
   <!-- חץ צפון: ה'מחט' מסתובבת כך שתמיד מצביעה לצפון גם כשהמפה מסתובבת בתנועה -->
   <div class="north" id="north" title="צפון — לחץ ליישור צפונה">
@@ -303,8 +329,16 @@
       const L = LAYERS[key];
       return {
         version: 8,
-        sources: { base: { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" } },
-        layers: [{ id: "base", type: "raster", source: "base" }]
+        sources: {
+          base: { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
+          route: { type: "geojson", data: { type: "FeatureCollection", features: [] } }
+        },
+        layers: [
+          { id: "base", type: "raster", source: "base" },
+          { id: "route-line", type: "line", source: "route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "#c2682a", "line-width": 5, "line-opacity": 0.92 } }
+        ]
       };
     }
 
@@ -330,7 +364,7 @@
     function switchLayer(key) {
       current = key;
       map.setStyle(styleFor(key));
-      map.once("styledata", drawDemo);
+      map.once("styledata", () => { applyRoute(); loadPois(); });
       [...layersEl.children].forEach(c => c.classList.toggle("active", c.dataset.k === key));
       setCredit(key);
       renderLegend();
@@ -427,61 +461,125 @@
     }
     map.on("moveend", () => { if (current === "satellite") updateImageryDate(); });
 
-    // ===== הדגמת R3 (עצירות לאורך מסלול) + R11 (אווטאר) =====
-    const demoRoute = {
-      type: "Feature", geometry: { type: "LineString", coordinates: [
-        [35.18,31.74],[35.22,31.78],[35.27,31.80],[35.31,31.83],[35.36,31.84]
-      ]}
-    };
-    const demoPois = [
-      { c:[35.20,31.76], n:"מעיין עין לבן", t:"מעיין 💧" },
-      { c:[35.25,31.79], n:"חורבת עתיקה", t:"עתיקות 🏛️" },
-      { c:[35.30,31.82], n:"נקודת תצפית", t:"תצפית 🔭" },
-      { c:[35.34,31.84], n:"עגלת קפה בשטח", t:"קפה ☕" },
-    ];
-
     // אווטאר המשתמש — נשלט ממסך הפרופיל (R11), משותף עם מודול ה-Supabase דרך window
     window.AVATAR_ICONS = { car:'🚗', jeep:'🚙', dog:'🐕', horse:'🐎', camel:'🐪', ibex:'🐐', fox:'🦊', eagle:'🦅' };
     window.MY_AVATAR = { color:'#4a7c59', icon:'jeep' };
-    window.setMyAvatar = function(color, icon){ window.MY_AVATAR = { color, icon }; drawDemo(); };
+    window.setMyAvatar = function(color, icon){ window.MY_AVATAR = { color, icon }; };
     window.__map = map;   // חשיפת המפה למודול ה-Supabase (סימוני חברי טיול חיים)
 
-    let demoMarkers = [];
-    function drawDemo() {
-      if (!map.getSource("route")) {
-        map.addSource("route", { type:"geojson", data: demoRoute });
-        map.addLayer({ id:"route-line", type:"line", source:"route",
-          paint:{ "line-color":"#c2682a", "line-width":5, "line-opacity":0.9 } });
-      }
-      // ניקוי סמנים קודמים (מונע כפילות בהחלפת שכבה)
-      demoMarkers.forEach(m => m.remove());
-      demoMarkers = [];
-      // עצירות
-      demoPois.forEach(p => {
-        const el = document.createElement("div");
-        el.style.cssText = "font-size:22px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))";
-        el.textContent = p.t.split(" ")[1];
-        const mk = new maplibregl.Marker({ element: el })
-          .setLngLat(p.c)
-          .setPopup(new maplibregl.Popup({offset:18}).setHTML(
-            `<div class="poi-pop"><b>${p.n}</b><span>${p.t}</span></div>`))
-          .addTo(map);
-        demoMarkers.push(mk);
-      });
-      // אווטאר משתמש (R11) — צבע ואייקון נבחרים, מתעדכן ממסך הפרופיל
-      const av = document.createElement("div");
-      av.className = "avatar";
-      av.style.background = window.MY_AVATAR.color;
-      av.textContent = window.AVATAR_ICONS[window.MY_AVATAR.icon] || "🚙";
-      demoMarkers.push(new maplibregl.Marker({ element: av }).setLngLat([35.18,31.74]).addTo(map));
+    // ========================================================================
+    // R2 — בחירת יעד וניתוב שטח אמיתי (BRouter) | R3 — נקודות עניין אמיתיות (OSM/Overpass)
+    // ========================================================================
+    let startPoint = null, destPoint = null, destMarker = null;
+    let poiMarkers = [], poiOn = true;
+    let lastRouteData = { type:"FeatureCollection", features:[] };
+    // שכבת המסלול מוגדרת בתוך הסגנון (styleFor) ולכן תמיד קיימת — רק מעדכנים נתונים
+    function applyRoute(data){
+      if(data) lastRouteData = data;
+      const s = map.getSource("route");
+      if(s) s.setData(lastRouteData);
     }
-    map.on("load", drawDemo);
+    // החלה מחדש כשהסגנון/המקור מתייצב (קו המסלול מוגדר בתוך הסגנון)
+    map.on("styledata", () => applyRoute());
+    map.on("idle", () => applyRoute());
+
+    // R3 — קטגוריות נקודות עניין (תגיות OSM אמיתיות)
+    const POI_DEFS = [
+      { k:'natural=spring',               icon:'💧', label:'מעיין' },
+      { k:'natural=cave_entrance',        icon:'🕳️', label:'מערה' },
+      { k:'historic=archaeological_site', icon:'🏛️', label:'אתר עתיקות' },
+      { k:'historic=ruins',               icon:'🏚️', label:'חורבה' },
+      { k:'tourism=viewpoint',            icon:'🔭', label:'תצפית' },
+      { k:'natural=peak',                 icon:'⛰️', label:'פסגה' },
+      { k:'waterway=waterfall',           icon:'🌊', label:'מפל' },
+      { k:'tourism=picnic_site',          icon:'🧺', label:'פיקניק' },
+      { k:'tourism=camp_site',            icon:'⛺', label:'חניון לילה' },
+      { k:'amenity=drinking_water',       icon:'🚰', label:'מי שתייה' },
+      { k:'amenity=cafe',                 icon:'☕', label:'בית קפה' },
+    ];
+
+    function setRouteInfo(t, show=true){ const e=document.getElementById('routeInfo'); if(!e) return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; const h=document.getElementById('hint'); if(h&&show) h.style.display='none'; }
+    function setPoiStatus(t){ const e=document.getElementById('poiStatus'); if(e){ e.textContent=t; e.style.display=t?'block':'none'; } }
+
+    let poiTimer=null, poiAbort=null;
+    function schedulePois(){ if(!poiOn) return; clearTimeout(poiTimer); poiTimer=setTimeout(loadPois,900); }
+    async function loadPois(){
+      if(!poiOn) return;
+      if(map.getZoom()<11){ setPoiStatus('התקרבו (זום) כדי לראות נקודות עניין'); return; }
+      const b=map.getBounds(), bbox=`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+      const body='[out:json][timeout:25];('+POI_DEFS.map(d=>{const[k,v]=d.k.split('=');return `nwr["${k}"="${v}"](${bbox});`;}).join('')+');out center 150;';
+      setPoiStatus('טוען נקודות עניין…');
+      try{
+        if(poiAbort) poiAbort.abort();
+        poiAbort=new AbortController();
+        const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body,signal:poiAbort.signal});
+        renderPois((await r.json()).elements||[]);
+      }catch(e){ if(e.name!=='AbortError') setPoiStatus('שגיאה בטעינת נקודות עניין (Overpass)'); }
+    }
+    function renderPois(elems){
+      poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; let n=0;
+      elems.forEach(el=>{
+        const lng=el.lon!=null?el.lon:(el.center&&el.center.lon), lat=el.lat!=null?el.lat:(el.center&&el.center.lat);
+        if(lng==null||lat==null) return;
+        const tags=el.tags||{}; let def=null;
+        for(const d of POI_DEFS){ const[k,v]=d.k.split('='); if(tags[k]===v){def=d;break;} }
+        if(!def) return; n++;
+        const name=tags['name:he']||tags.name||def.label;
+        const div=document.createElement('div');
+        div.style.cssText='font-size:21px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))';
+        div.textContent=def.icon;
+        const desc=tags['description:he']||tags.description||'';
+        let extra='';
+        if(tags.wikipedia){ const w=tags.wikipedia, t=w.includes(':')?w.split(':').slice(1).join(':'):w; extra+=`<br><a href="https://he.wikipedia.org/wiki/${encodeURIComponent(t)}" target="_blank">ויקיפדיה ↗</a>`; }
+        if(tags.website) extra+=`<br><a href="${tags.website}" target="_blank">אתר ↗</a>`;
+        extra+=`<br><a href="https://www.openstreetmap.org/${el.type}/${el.id}" target="_blank">פרטים ב-OSM ↗</a>`;
+        const html=`<div class="poi-pop"><b>${name}</b><span>${def.icon} ${def.label}${desc?' · '+desc:''}</span>${extra}<br><button class="poi-route-btn" data-lng="${lng}" data-lat="${lat}">🧭 נווט לכאן</button></div>`;
+        const popup=new maplibregl.Popup({offset:18}).setHTML(html);
+        const mk=new maplibregl.Marker({element:div}).setLngLat([lng,lat]).setPopup(popup).addTo(map);
+        popup.on('open',()=>{ const btn=document.querySelector('.poi-route-btn'); if(btn) btn.onclick=()=>{ setDestination([+btn.dataset.lng,+btn.dataset.lat]); popup.remove(); }; });
+        poiMarkers.push(mk);
+      });
+      setPoiStatus(`נמצאו ${n} נקודות עניין באזור`);
+    }
+
+    // R2 — בחירת יעד וחישוב מסלול שטח אמיתי
+    async function setDestination(lnglat){
+      destPoint=lnglat;
+      if(destMarker) destMarker.remove();
+      const el=document.createElement('div'); el.textContent='🚩'; el.style.cssText='font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+      destMarker=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(lnglat).addTo(map);
+      const start=startPoint||[map.getCenter().lng,map.getCenter().lat];
+      await routeTo(start,lnglat);
+    }
+    async function routeTo(start,dest){
+      setRouteInfo('מחשב מסלול שטח…');
+      const url=`https://brouter.de/brouter?lonlats=${start[0].toFixed(5)},${start[1].toFixed(5)}|${dest[0].toFixed(5)},${dest[1].toFixed(5)}&profile=trekking&alternativeidx=0&format=geojson`;
+      try{
+        const j=await (await fetch(url)).json();
+        if(!j.features||!j.features.length){ setRouteInfo('לא נמצא מסלול שטח בין הנקודות'); return; }
+        applyRoute(j);
+        const p=j.features[0].properties||{}, km=p['track-length']?(p['track-length']/1000).toFixed(1):'?';
+        setRouteInfo(`מסלול שטח · ${km} ק"מ`);
+        const co=j.features[0].geometry.coordinates;
+        map.fitBounds(co.reduce((bb,c)=>bb.extend(c),new maplibregl.LngLatBounds(co[0],co[0])),{padding:70,maxZoom:15});
+      }catch(e){ setRouteInfo('שגיאה בחישוב מסלול — נסו נקודות קרובות יותר'); }
+    }
+    function clearRoute(){ if(destMarker){destMarker.remove();destMarker=null;} destPoint=null; lastRouteData={type:"FeatureCollection",features:[]}; if(map.getSource('route')) map.getSource('route').setData(lastRouteData); setRouteInfo('',false); const h=document.getElementById('hint'); if(h) h.style.display='block'; }
+
+    // הקשה על אזור פנוי במפה = בחירת יעד
+    map.on('click', e=>setDestination([e.lngLat.lng,e.lngLat.lat]));
+    map.on('moveend', schedulePois);
+    map.on('load', loadPois);
+
+    document.getElementById('poiBtn').onclick=(e)=>{ poiOn=!poiOn; e.currentTarget.classList.toggle('active',poiOn);
+      if(poiOn) loadPois(); else { poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; setPoiStatus(''); } };
+    document.getElementById('clearRouteBtn').onclick=clearRoute;
 
     // ===== כפתור מיקום (R1) =====
     document.getElementById("locateBtn").onclick = () => {
       if (!navigator.geolocation) return alert("אין תמיכה באיתור מיקום");
       navigator.geolocation.getCurrentPosition(
-        pos => map.flyTo({ center:[pos.coords.longitude, pos.coords.latitude], zoom:14 }),
+        pos => { startPoint = [pos.coords.longitude, pos.coords.latitude]; map.flyTo({ center: startPoint, zoom:14 }); },
         () => alert("לא הצלחנו לאתר מיקום (בדפדפן/הרשאות)")
       );
     };
