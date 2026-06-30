@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ניווט שטח · POC מפה</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: rgba(255,255,255,0.92);
+      --panel-blur: blur(12px);
+      --text: #2c2a26;
+      --muted: #6b6256;
+      --accent: #c2682a;       /* כתום-אדמה, צבע שטח חם */
+      --accent-2: #4a7c59;     /* ירוק טבע */
+      --shadow: 0 6px 24px rgba(60,50,35,0.18);
+      --radius: 18px;
+    }
+    [data-theme="night"] {
+      --bg: #1a1d1f;
+      --panel: rgba(28,32,34,0.92);
+      --text: #ecebe6;
+      --muted: #9aa0a2;
+      --shadow: 0 6px 24px rgba(0,0,0,0.5);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; font-family: "Segoe UI", "Heebo", system-ui, sans-serif; }
+    #map { position: absolute; inset: 0; }
+
+    /* כותרת צפה */
+    .topbar {
+      position: absolute; top: 14px; right: 14px; left: 14px; z-index: 5;
+      display: flex; align-items: center; justify-content: space-between;
+      pointer-events: none;
+    }
+    .brand {
+      pointer-events: auto;
+      display: flex; align-items: center; gap: 10px;
+      background: var(--panel); backdrop-filter: var(--panel-blur);
+      padding: 10px 16px; border-radius: var(--radius); box-shadow: var(--shadow);
+      color: var(--text); font-weight: 700; font-size: 16px;
+    }
+    .brand .logo {
+      width: 30px; height: 30px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center; color: #fff; font-size: 17px;
+    }
+    .brand small { font-weight: 500; color: var(--muted); font-size: 12px; }
+
+    .top-actions { pointer-events: auto; display: flex; gap: 8px; }
+    .icon-btn {
+      width: 46px; height: 46px; border: none; cursor: pointer;
+      background: var(--panel); backdrop-filter: var(--panel-blur);
+      border-radius: 14px; box-shadow: var(--shadow);
+      color: var(--text); font-size: 20px; display: grid; place-items: center;
+      transition: transform .12s ease, background .2s;
+    }
+    .icon-btn:hover { transform: translateY(-2px); }
+    .icon-btn:active { transform: scale(.94); }
+    .icon-btn.active { background: var(--accent); color: #fff; }
+
+    /* חץ צפון — תמיד מצביע לצפון */
+    .north {
+      position: absolute; top: 74px; right: 14px; z-index: 5; cursor: pointer;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--panel); backdrop-filter: var(--panel-blur); box-shadow: var(--shadow);
+      display: grid; place-items: center; color: var(--text);
+    }
+    .north .needle { transition: transform .15s linear; display: grid; place-items: center; }
+    .north .needle .tip { color: #d23b3b; font-size: 22px; line-height: 1; }
+    .north .lbl { position: absolute; bottom: 4px; font-size: 10px; font-weight: 800; color: var(--muted); }
+
+    /* בורר שכבות */
+    .layers {
+      position: absolute; bottom: 92px; left: 14px; z-index: 5;
+      background: var(--panel); backdrop-filter: var(--panel-blur);
+      border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .layer-chip {
+      border: none; cursor: pointer; text-align: right;
+      background: transparent; color: var(--text);
+      padding: 9px 14px; border-radius: 12px; font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; gap: 9px; transition: background .15s;
+    }
+    .layer-chip:hover { background: rgba(128,128,128,0.12); }
+    .layer-chip.active { background: var(--accent); color: #fff; }
+    .layer-chip .dot { font-size: 16px; }
+
+    /* פאנל קרדיטים + תאריך צילום */
+    .credits {
+      position: absolute; bottom: 14px; right: 14px; z-index: 5;
+      background: var(--panel); backdrop-filter: var(--panel-blur);
+      border-radius: 14px; box-shadow: var(--shadow);
+      max-width: 320px; overflow: hidden; color: var(--text);
+    }
+    .credits summary {
+      cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 600;
+      list-style: none; display: flex; align-items: center; gap: 8px;
+    }
+    .credits summary::-webkit-details-marker { display: none; }
+    .credits .body { padding: 0 14px 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .credits a { color: var(--accent); text-decoration: none; }
+    .credits a:hover { text-decoration: underline; }
+    .credits .imgdate {
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(128,128,128,.25);
+      font-size: 12px; color: var(--text); font-weight: 600; display: none;
+    }
+
+    /* מקרא */
+    .legend {
+      position: absolute; bottom: 92px; left: 150px; z-index: 6; display: none;
+      background: var(--panel); backdrop-filter: var(--panel-blur);
+      border-radius: 14px; box-shadow: var(--shadow); padding: 12px 14px; color: var(--text);
+      min-width: 180px;
+    }
+    .legend h4 { margin: 0 0 8px; font-size: 13px; }
+    .legend .item { display: flex; align-items: center; gap: 9px; font-size: 12.5px; padding: 3px 0; }
+    .legend .sw { width: 22px; height: 0; flex: 0 0 22px; border-radius: 2px; }
+    .legend .ln { height: 4px; }
+    .legend .bx { height: 14px; border-radius: 3px; }
+
+    /* כפתור מיקום צף */
+    .locate {
+      position: absolute; bottom: 92px; right: 14px; z-index: 5;
+      width: 56px; height: 56px; border: none; cursor: pointer;
+      background: var(--accent); color: #fff; border-radius: 50%;
+      box-shadow: var(--shadow); font-size: 24px; display: grid; place-items: center;
+      transition: transform .12s ease;
+    }
+    .locate:hover { transform: translateY(-2px); }
+    .locate:active { transform: scale(.92); }
+
+    /* כרטיס עצירה לדוגמה (R3) */
+    .maplibregl-popup-content {
+      border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow);
+      font-family: inherit; direction: rtl; text-align: right;
+    }
+    .poi-pop b { display:block; font-size: 14px; color: #2c2a26; margin-bottom: 2px; }
+    .poi-pop span { font-size: 12px; color: #6b6256; }
+
+    /* אווטאר משתמש לדוגמה (R11) */
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3); display: grid; place-items: center;
+      font-size: 17px; color:#fff;
+    }
+  </style>
+</head>
+<body data-theme="day">
+  <div id="map"></div>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🧭</div>
+      <div>ניווט שטח <small>· POC רכיב מפה</small></div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
+      <button class="icon-btn" id="headingBtn" title="סימולציית תנועה (heading-up)">🚗</button>
+      <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
+    </div>
+  </div>
+
+  <!-- חץ צפון: ה'מחט' מסתובבת כך שתמיד מצביעה לצפון גם כשהמפה מסתובבת בתנועה -->
+  <div class="north" id="north" title="צפון — לחץ ליישור צפונה">
+    <div class="needle" id="needle"><div class="tip">▲</div></div>
+    <div class="lbl">צ</div>
+  </div>
+
+  <div class="layers" id="layers"></div>
+  <div class="legend" id="legend"></div>
+
+  <button class="locate" id="locateBtn" title="המיקום שלי">📍</button>
+
+  <details class="credits" open>
+    <summary>ℹ️ מקורות וקרדיטים</summary>
+    <div class="body" id="creditsBody"></div>
+    <div class="imgdate" id="imgDate"></div>
+  </details>
+
+  <script>
+    // ===== הגדרת מקורות מפה (כולם חינמיים) =====
+    const LAYERS = {
+      hiking: {
+        label: "טופוגרפי / שבילים",
+        icon: "🥾",
+        tiles: ["https://israelhiking.osm.org.il/Hebrew/Tiles/{z}/{x}/{y}.png"],
+        maxzoom: 16,
+        credit: 'מפת שבילים: <a href="https://israelhiking.osm.org.il" target="_blank">Israel Hiking Map</a> (CC BY-NC-SA) · נתונים: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>'
+      },
+      satellite: {
+        label: "צילום אוויר",
+        icon: "🛰️",
+        tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+        maxzoom: 19,
+        credit: 'צילום אוויר: <a href="https://www.esri.com" target="_blank">Esri World Imagery</a> · Maxar, Earthstar Geographics'
+      },
+      street: {
+        label: "מפת רחוב",
+        icon: "🗺️",
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        maxzoom: 19,
+        credit: 'מפת רחוב: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>'
+      }
+    };
+
+    // ===== תוכן המקרא לכל שכבה =====
+    const LEGENDS = {
+      hiking: { title: "מקרא — שבילים מסומנים", items: [
+        { t:"line", c:"#e2231a", l:"שביל מסומן אדום" },
+        { t:"line", c:"#1f6fd1", l:"שביל מסומן כחול" },
+        { t:"line", c:"#2e9e3f", l:"שביל מסומן ירוק" },
+        { t:"line", c:"#222",    l:"שביל מסומן שחור" },
+        { t:"line", c:"#b48a2a", l:"דרך עפר / שביל" },
+        { t:"line", c:"#caa",    l:"קווי גובה" },
+      ]},
+      street: { title: "מקרא — מפת רחוב", items: [
+        { t:"line", c:"#f6a821", l:"כביש ראשי" },
+        { t:"line", c:"#cfcabb", l:"כביש משני / מקומי" },
+        { t:"line", c:"#9a7", l:"שביל / מדרכה" },
+        { t:"box",  c:"#aad3df", l:"מקווה מים" },
+        { t:"box",  c:"#c8e6b4", l:"פארק / שטח ירוק" },
+        { t:"box",  c:"#d9d0c7", l:"בנייה" },
+      ]},
+      satellite: { title: "מקרא — צילום אוויר", items: [
+        { t:"note", l:"לצילום אוויר אין מקרא סימונים — תצוגת קרקע אמיתית." },
+      ]},
+    };
+
+    function styleFor(key) {
+      const L = LAYERS[key];
+      return {
+        version: 8,
+        sources: { base: { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" } },
+        layers: [{ id: "base", type: "raster", source: "base" }]
+      };
+    }
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: styleFor("hiking"),
+      center: [35.21, 31.77],   // ירושלים / מרכז הארץ
+      zoom: 8,
+      attributionControl: false
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-left");
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
+
+    // ===== בורר שכבות =====
+    let current = "hiking";
+    const layersEl = document.getElementById("layers");
+    const creditsBody = document.getElementById("creditsBody");
+
+    function setCredit(key) {
+      creditsBody.innerHTML = LAYERS[key].credit +
+        '<br><br><span>נבנה ממקורות מידע פתוחים בלבד.</span>';
+    }
+    function switchLayer(key) {
+      current = key;
+      map.setStyle(styleFor(key));
+      map.once("styledata", drawDemo);
+      [...layersEl.children].forEach(c => c.classList.toggle("active", c.dataset.k === key));
+      setCredit(key);
+      renderLegend();
+      updateImageryDate();
+    }
+    Object.entries(LAYERS).forEach(([key, L]) => {
+      const b = document.createElement("button");
+      b.className = "layer-chip" + (key === current ? " active" : "");
+      b.dataset.k = key;
+      b.innerHTML = `<span class="dot">${L.icon}</span>${L.label}`;
+      b.onclick = () => switchLayer(key);
+      layersEl.appendChild(b);
+    });
+    setCredit(current);
+
+    // ===== מקרא (R: מפת רחוב ועוד) =====
+    const legendEl = document.getElementById("legend");
+    let legendOpen = false;
+    function renderLegend() {
+      const L = LEGENDS[current];
+      legendEl.innerHTML = `<h4>${L.title}</h4>` + L.items.map(i => {
+        if (i.t === "note") return `<div class="item" style="color:var(--muted)">${i.l}</div>`;
+        const sw = i.t === "line"
+          ? `<span class="sw ln" style="background:${i.c}"></span>`
+          : `<span class="sw bx" style="background:${i.c}"></span>`;
+        return `<div class="item">${sw}<span>${i.l}</span></div>`;
+      }).join("");
+    }
+    document.getElementById("legendBtn").onclick = (e) => {
+      legendOpen = !legendOpen;
+      legendEl.style.display = legendOpen ? "block" : "none";
+      e.currentTarget.classList.toggle("active", legendOpen);
+      if (legendOpen) renderLegend();
+    };
+
+    // ===== חץ צפון — תמיד מצביע צפונה =====
+    const needle = document.getElementById("needle");
+    function updateNorth() {
+      // bearing = הכיוון ש"למעלה" במסך; הצפון נמצא בזווית -bearing מהמסך
+      needle.style.transform = `rotate(${-map.getBearing()}deg)`;
+    }
+    map.on("rotate", updateNorth);
+    map.on("load", updateNorth);
+    document.getElementById("north").onclick = () => map.easeTo({ bearing: 0, pitch: 0 });
+
+    // סימולציית תנועה (heading-up): המפה מסתובבת כאילו המשתמש פונה,
+    // והחץ ממשיך להצביע צפונה — ההתנהגות הנדרשת בתנועה.
+    let headingTimer = null, hb = 0;
+    document.getElementById("headingBtn").onclick = (e) => {
+      if (headingTimer) {
+        clearInterval(headingTimer); headingTimer = null;
+        e.currentTarget.classList.remove("active");
+        map.easeTo({ bearing: 0 });
+      } else {
+        e.currentTarget.classList.add("active");
+        headingTimer = setInterval(() => { hb = (hb + 6) % 360; map.setBearing(hb); }, 120);
+      }
+    };
+
+    // ===== תאריך צילום אוויר (חי מ-Esri World Imagery) =====
+    const imgDateEl = document.getElementById("imgDate");
+    let imgReq = 0;
+    async function updateImageryDate() {
+      if (current !== "satellite") { imgDateEl.style.display = "none"; return; }
+      const my = ++imgReq;
+      imgDateEl.style.display = "block";
+      imgDateEl.textContent = "📷 מאתר תאריך צילום…";
+      try {
+        const c = map.getCenter(), b = map.getBounds();
+        const ext = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(",");
+        const url = "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/identify"
+          + `?f=json&geometry=${c.lng},${c.lat}&geometryType=esriGeometryPoint&sr=4326`
+          + `&layers=all&tolerance=1&mapExtent=${ext}&imageDisplay=800,600,96&returnGeometry=false`;
+        const r = await fetch(url); const j = await r.json();
+        if (my !== imgReq) return; // נזרקה בקשה חדשה יותר
+        const a = (j.results && j.results[0] && j.results[0].attributes) || {};
+        let date = "", desc = "";
+        for (const k in a) {
+          let v = a[k];
+          if (v == null || v === "Null" || v === "") continue;
+          if (/date/i.test(k) && !date) date = v;
+          if (/(desc|source)/i.test(k) && !desc) desc = v;
+        }
+        let ds = String(date);
+        if (/^\d{8}$/.test(ds)) ds = ds.slice(0,4) + "-" + ds.slice(4,6) + "-" + ds.slice(6,8);
+        else if (typeof date === "number" && date > 1e11) ds = new Date(date).toISOString().slice(0, 10);
+        imgDateEl.innerHTML = date
+          ? `📷 צולם: ${ds}${desc ? " (" + desc + ")" : ""} · מקור: Esri World Imagery`
+          : "📷 תאריך הצילום משתנה לפי אזור · מקור: Esri World Imagery";
+      } catch (e) {
+        if (my !== imgReq) return;
+        imgDateEl.innerHTML = "📷 תאריך צילום: לא זמין · מקור: Esri/Maxar";
+      }
+    }
+    map.on("moveend", () => { if (current === "satellite") updateImageryDate(); });
+
+    // ===== הדגמת R3 (עצירות לאורך מסלול) + R11 (אווטאר) =====
+    const demoRoute = {
+      type: "Feature", geometry: { type: "LineString", coordinates: [
+        [35.18,31.74],[35.22,31.78],[35.27,31.80],[35.31,31.83],[35.36,31.84]
+      ]}
+    };
+    const demoPois = [
+      { c:[35.20,31.76], n:"מעיין עין לבן", t:"מעיין 💧" },
+      { c:[35.25,31.79], n:"חורבת עתיקה", t:"עתיקות 🏛️" },
+      { c:[35.30,31.82], n:"נקודת תצפית", t:"תצפית 🔭" },
+      { c:[35.34,31.84], n:"עגלת קפה בשטח", t:"קפה ☕" },
+    ];
+
+    let demoMarkers = [];
+    function drawDemo() {
+      if (!map.getSource("route")) {
+        map.addSource("route", { type:"geojson", data: demoRoute });
+        map.addLayer({ id:"route-line", type:"line", source:"route",
+          paint:{ "line-color":"#c2682a", "line-width":5, "line-opacity":0.9 } });
+      }
+      // ניקוי סמנים קודמים (מונע כפילות בהחלפת שכבה)
+      demoMarkers.forEach(m => m.remove());
+      demoMarkers = [];
+      // עצירות
+      demoPois.forEach(p => {
+        const el = document.createElement("div");
+        el.style.cssText = "font-size:22px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))";
+        el.textContent = p.t.split(" ")[1];
+        const mk = new maplibregl.Marker({ element: el })
+          .setLngLat(p.c)
+          .setPopup(new maplibregl.Popup({offset:18}).setHTML(
+            `<div class="poi-pop"><b>${p.n}</b><span>${p.t}</span></div>`))
+          .addTo(map);
+        demoMarkers.push(mk);
+      });
+      // אווטאר משתמש לדוגמה (R11) — ג'יפ בצבע נבחר
+      const av = document.createElement("div");
+      av.className = "avatar";
+      av.style.background = "#4a7c59";
+      av.textContent = "🚙";
+      demoMarkers.push(new maplibregl.Marker({ element: av }).setLngLat([35.18,31.74]).addTo(map));
+    }
+    map.on("load", drawDemo);
+
+    // ===== כפתור מיקום (R1) =====
+    document.getElementById("locateBtn").onclick = () => {
+      if (!navigator.geolocation) return alert("אין תמיכה באיתור מיקום");
+      navigator.geolocation.getCurrentPosition(
+        pos => map.flyTo({ center:[pos.coords.longitude, pos.coords.latitude], zoom:14 }),
+        () => alert("לא הצלחנו לאתר מיקום (בדפדפן/הרשאות)")
+      );
+    };
+
+    // ===== מצב יום/לילה =====
+    document.getElementById("themeBtn").onclick = (e) => {
+      const night = document.body.dataset.theme === "night";
+      document.body.dataset.theme = night ? "day" : "night";
+      e.currentTarget.textContent = night ? "🌙" : "☀️";
+    };
+  </script>
+</body>
+</html>

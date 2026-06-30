@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ניווט שטח · תכנון מסלול + עצירות (R2+R3)</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/@turf/turf@7.1.0/turf.min.js"></script>
+  <style>
+    :root{ --bg:#f4f1ea; --panel:rgba(255,255,255,.94); --text:#2c2a26; --muted:#6b6256;
+           --accent:#c2682a; --accent-2:#4a7c59; --shadow:0 6px 24px rgba(60,50,35,.18); --radius:18px; }
+    *{box-sizing:border-box} html,body{margin:0;height:100%;font-family:"Segoe UI","Heebo",system-ui,sans-serif}
+    #map{position:absolute;inset:0}
+    .brand{position:absolute;top:14px;right:14px;z-index:5;display:flex;align-items:center;gap:10px;
+      background:var(--panel);backdrop-filter:blur(12px);padding:10px 16px;border-radius:var(--radius);
+      box-shadow:var(--shadow);color:var(--text);font-weight:700;font-size:15px}
+    .brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:grid;place-items:center;color:#fff;font-size:17px}
+    .brand small{font-weight:500;color:var(--muted);font-size:12px}
+
+    /* פאנל תכנון */
+    .planner{position:absolute;top:14px;left:14px;z-index:6;width:330px;max-width:calc(100% - 28px);
+      background:var(--panel);backdrop-filter:blur(12px);border-radius:var(--radius);box-shadow:var(--shadow);
+      color:var(--text);overflow:hidden}
+    .planner header{padding:14px 16px 10px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+    .hint{padding:0 16px 12px;font-size:13px;color:var(--muted);line-height:1.5}
+    .row{display:flex;gap:8px;padding:0 12px 12px}
+    .btn{flex:1;border:none;cursor:pointer;border-radius:12px;padding:11px;font-size:14px;font-weight:600;
+      background:var(--accent);color:#fff;transition:transform .12s,opacity .2s}
+    .btn.ghost{background:rgba(128,128,128,.14);color:var(--text)}
+    .btn:hover{transform:translateY(-1px)} .btn:active{transform:scale(.96)} .btn:disabled{opacity:.5;cursor:default}
+    .status{padding:8px 16px;font-size:12.5px;color:var(--muted);min-height:18px}
+    .stats{display:flex;gap:14px;padding:0 16px 10px;font-size:13px;color:var(--text)}
+    .stats b{color:var(--accent)}
+    .stops{max-height:42vh;overflow:auto;padding:0 8px 10px}
+    .stop{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer}
+    .stop:hover{background:rgba(128,128,128,.1)}
+    .stop .ic{font-size:20px;width:26px;text-align:center}
+    .stop .nm{font-size:13.5px;font-weight:600}
+    .stop .ds{font-size:11.5px;color:var(--muted)}
+    .credits{position:absolute;bottom:12px;right:12px;z-index:5;background:var(--panel);backdrop-filter:blur(12px);
+      border-radius:12px;box-shadow:var(--shadow);max-width:320px;color:var(--text)}
+    .credits summary{cursor:pointer;padding:9px 13px;font-size:12.5px;font-weight:600;list-style:none}
+    .credits summary::-webkit-details-marker{display:none}
+    .credits .b{padding:0 13px 11px;font-size:11.5px;color:var(--muted);line-height:1.6}
+    .credits a{color:var(--accent);text-decoration:none}
+    .pin{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));cursor:pointer}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="brand"><div class="logo">🧭</div><div>ניווט שטח <small>· תכנון מסלול חי</small></div></div>
+
+  <div class="planner">
+    <header>🗺️ תכנון מסלול שטח + עצירות</header>
+    <div class="hint" id="hint">לחץ על המפה לבחירת <b>נקודת התחלה</b>, ואז על <b>היעד</b>. היישום יחשב מסלול שטח ויציע עצירות אטרקטיביות לאורכו.</div>
+    <div class="row">
+      <button class="btn" id="planBtn" disabled>חשב מסלול + עצירות</button>
+      <button class="btn ghost" id="resetBtn">איפוס</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="stats" id="stats"></div>
+    <div class="stops" id="stops"></div>
+  </div>
+
+  <details class="credits" open>
+    <summary>ℹ️ מקורות וקרדיטים</summary>
+    <div class="b">
+      מפה: <a href="https://israelhiking.osm.org.il" target="_blank">Israel Hiking Map</a> ·
+      ניתוב: <a href="https://brouter.de" target="_blank">BRouter</a> ·
+      עצירות: <a href="https://overpass-api.de" target="_blank">Overpass</a> /
+      <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>
+    </div>
+  </details>
+
+  <script>
+    const map = new maplibregl.Map({
+      container:"map",
+      style:{version:8,sources:{base:{type:"raster",
+        tiles:["https://israelhiking.osm.org.il/Hebrew/Tiles/{z}/{x}/{y}.png"],tileSize:256,maxzoom:16}},
+        layers:[{id:"base",type:"raster",source:"base"}]},
+      center:[35.18,31.76], zoom:12, attributionControl:false
+    });
+    map.addControl(new maplibregl.NavigationControl({showCompass:true}),"bottom-left");
+    map.addControl(new maplibregl.ScaleControl({unit:"metric"}),"bottom-left");
+
+    // קטגוריות POI: תגית OSM -> אייקון + שם
+    const CATS = {
+      spring:{icon:"💧",label:"מעיין",match:t=>t.natural==="spring"},
+      arch:  {icon:"🏛️",label:"עתיקות",match:t=>t.historic==="archaeological_site"||t.historic==="ruins"},
+      cave:  {icon:"🕳️",label:"מערה",match:t=>t.natural==="cave_entrance"},
+      view:  {icon:"🔭",label:"תצפית",match:t=>t.tourism==="viewpoint"},
+      water: {icon:"🚰",label:"מי שתייה",match:t=>t.amenity==="drinking_water"},
+      cafe:  {icon:"☕",label:"קפה / מזון",match:t=>t.amenity==="cafe"||t.amenity==="restaurant"},
+      picnic:{icon:"🌳",label:"פיקניק / חניון",match:t=>t.tourism==="picnic_site"||t.tourism==="camp_site"},
+    };
+    function classify(tags){ for(const k in CATS) if(CATS[k].match(tags)) return CATS[k]; return null; }
+
+    let pts=[], pinMarkers=[], stopMarkers=[];
+    const $=id=>document.getElementById(id);
+    const setStatus=t=>$("status").textContent=t;
+
+    map.on("click", e=>{
+      if(pts.length>=2) return;
+      pts.push([e.lngLat.lng, e.lngLat.lat]);
+      const el=document.createElement("div"); el.className="pin";
+      el.textContent = pts.length===1 ? "🟢" : "🚩";
+      pinMarkers.push(new maplibregl.Marker({element:el,anchor:"bottom"}).setLngLat(pts[pts.length-1]).addTo(map));
+      $("planBtn").disabled = pts.length<2;
+      $("hint").innerHTML = pts.length===1 ? "עכשיו לחץ על <b>היעד</b>." : "מצוין! לחץ <b>חשב מסלול + עצירות</b>.";
+    });
+
+    $("resetBtn").onclick = ()=>{
+      pts=[]; pinMarkers.forEach(m=>m.remove()); pinMarkers=[];
+      stopMarkers.forEach(m=>m.remove()); stopMarkers=[];
+      if(map.getLayer("route-l")) map.removeLayer("route-l");
+      if(map.getLayer("corridor-f")) map.removeLayer("corridor-f");
+      if(map.getSource("route")) map.removeSource("route");
+      if(map.getSource("corridor")) map.removeSource("corridor");
+      $("planBtn").disabled=true; $("stops").innerHTML=""; $("stats").innerHTML=""; setStatus("");
+      $("hint").innerHTML="לחץ על המפה לבחירת <b>נקודת התחלה</b>, ואז על <b>היעד</b>.";
+    };
+
+    $("planBtn").onclick = plan;
+
+    const ensureLoaded=()=>new Promise(r=>{ if(map.isStyleLoaded())return r();
+      const c=()=>{ if(map.isStyleLoaded()){map.off("idle",c);r();} }; map.on("idle",c); });
+
+    async function plan(){
+      $("planBtn").disabled=true;
+      try{
+        await ensureLoaded();
+        // 1) ניתוב שטח אמיתי (R2) דרך BRouter — פרופיל הליכה
+        setStatus("מחשב מסלול שטח (BRouter)…");
+        let line;
+        const ll = pts.map(p=>p[0]+","+p[1]).join("|");
+        const url=`https://brouter.de/brouter?lonlats=${ll}&profile=hiking-mountain&alternativeidx=0&format=geojson`;
+        try{
+          const r=await fetch(url); const j=await r.json();
+          line=j.features[0]; // LineString
+        }catch(err){
+          setStatus("ניתוב לא זמין — משתמש בקו ישיר כמסדרון.");
+          line={type:"Feature",geometry:{type:"LineString",coordinates:pts},properties:{}};
+        }
+        drawRoute(line);
+        const km=(turf.length(line,{units:"kilometers"})).toFixed(1);
+
+        // 2) מסדרון של 1 ק"מ סביב המסלול (R3 — corridor search)
+        const corridor=turf.buffer(line,1,{units:"kilometers"});
+        drawCorridor(corridor);
+
+        // 3) שליפת POI אמיתיים מ-Overpass בתוך bbox המסלול
+        setStatus("שולף עצירות אטרקטיביות מ-OpenStreetMap…");
+        const b=turf.bbox(line); // [minX,minY,maxX,maxY]
+        const bbox=`${b[1]},${b[0]},${b[3]},${b[2]}`; // S,W,N,E
+        const q=`[out:json][timeout:25];(
+          node["natural"="spring"](${bbox});
+          node["historic"="archaeological_site"](${bbox});
+          way["historic"="archaeological_site"](${bbox});
+          node["historic"="ruins"](${bbox});
+          node["natural"="cave_entrance"](${bbox});
+          node["tourism"="viewpoint"](${bbox});
+          node["amenity"="drinking_water"](${bbox});
+          node["amenity"="cafe"](${bbox});
+          node["tourism"="picnic_site"](${bbox});
+        );out center;`;
+        const resp=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
+        const data=await resp.json();
+
+        // 4) סינון לפי מסדרון + דירוג לפי מרחק מהמסלול
+        const seen=new Set(); const stops=[];
+        for(const el of data.elements){
+          const lon=el.lon??el.center?.lon, lat=el.lat??el.center?.lat;
+          if(lon==null) continue;
+          const cat=classify(el.tags||{}); if(!cat) continue;
+          const pt=turf.point([lon,lat]);
+          const d=turf.pointToLineDistance(pt,line,{units:"kilometers"});
+          if(d>1) continue; // בתוך המסדרון בלבד
+          const name=(el.tags?.["name:he"]||el.tags?.name||cat.label);
+          const key=name+"|"+cat.label; if(seen.has(key)) continue; seen.add(key);
+          stops.push({lon,lat,name,cat,d});
+        }
+        stops.sort((a,b)=>a.d-b.d);
+        renderStops(stops);
+        $("stats").innerHTML=`אורך מסלול: <b>${km} ק"מ</b> &nbsp;·&nbsp; עצירות במסדרון: <b>${stops.length}</b>`;
+        setStatus(stops.length?"":"לא נמצאו עצירות מתויגות במסדרון זה — נסה מסלול אחר.");
+      }catch(err){
+        setStatus("שגיאה: "+err.message);
+      }
+    }
+
+    function drawRoute(line){
+      if(map.getSource("route")) map.getSource("route").setData(line);
+      else{ map.addSource("route",{type:"geojson",data:line});
+        map.addLayer({id:"route-l",type:"line",source:"route",
+          paint:{"line-color":"#c2682a","line-width":5,"line-opacity":.95}}); }
+      map.fitBounds(turf.bbox(line),{padding:{top:80,bottom:60,left:360,right:60}});
+    }
+    function drawCorridor(poly){
+      if(map.getSource("corridor")) map.getSource("corridor").setData(poly);
+      else{ map.addSource("corridor",{type:"geojson",data:poly});
+        map.addLayer({id:"corridor-f",type:"fill",source:"corridor",
+          paint:{"fill-color":"#4a7c59","fill-opacity":.12}},"route-l"); }
+    }
+    function renderStops(stops){
+      stopMarkers.forEach(m=>m.remove()); stopMarkers=[];
+      const box=$("stops"); box.innerHTML="";
+      stops.slice(0,40).forEach(s=>{
+        const el=document.createElement("div"); el.className="pin"; el.textContent=s.cat.icon;
+        const mk=new maplibregl.Marker({element:el})
+          .setLngLat([s.lon,s.lat])
+          .setPopup(new maplibregl.Popup({offset:16}).setHTML(
+            `<div style="direction:rtl;text-align:right"><b>${s.name}</b><br>
+             <span style="color:#6b6256;font-size:12px">${s.cat.label} · ${(s.d*1000).toFixed(0)} מ' מהמסלול</span></div>`))
+          .addTo(map);
+        stopMarkers.push(mk);
+        const row=document.createElement("div"); row.className="stop";
+        row.innerHTML=`<div class="ic">${s.cat.icon}</div><div><div class="nm">${s.name}</div>
+          <div class="ds">${s.cat.label} · ${(s.d*1000).toFixed(0)} מ' מהמסלול</div></div>`;
+        row.onclick=()=>{ map.flyTo({center:[s.lon,s.lat],zoom:15}); mk.togglePopup(); };
+        box.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
