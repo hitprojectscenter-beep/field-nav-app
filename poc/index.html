@@ -147,6 +147,40 @@
       box-shadow: 0 2px 8px rgba(0,0,0,.3); display: grid; place-items: center;
       font-size: 17px; color:#fff;
     }
+
+    /* כפתור חשבון + מודאל הרשמה/פרופיל (R9, R11) */
+    .account-btn .ava { width:100%; height:100%; display:grid; place-items:center; border-radius:14px; color:#fff; font-size:20px; }
+    .modal-backdrop {
+      position: absolute; inset: 0; z-index: 20; background: rgba(20,18,15,.45);
+      display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: min(380px, 92vw); max-height: 90vh; overflow:auto;
+      background: var(--panel); backdrop-filter: var(--panel-blur);
+      border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); padding: 22px; direction: rtl;
+    }
+    .modal h3 { margin: 0 0 4px; font-size: 19px; }
+    .modal p.sub { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+    .modal label { display:block; font-size:12px; font-weight:700; margin: 10px 0 4px; color: var(--muted); }
+    .modal input { width:100%; padding:11px 13px; border:1px solid rgba(128,128,128,.3); border-radius:11px;
+      background:transparent; color:var(--text); font-size:14px; font-family:inherit; }
+    .modal .btn { width:100%; margin-top:14px; padding:12px; border:none; border-radius:12px; cursor:pointer;
+      background: var(--accent); color:#fff; font-size:15px; font-weight:700; font-family:inherit; transition: transform .1s, opacity .2s; }
+    .modal .btn:active { transform: scale(.97); }
+    .modal .btn.ghost { background: transparent; color: var(--accent); margin-top:6px; }
+    .modal .msg { margin-top:12px; font-size:13px; min-height:18px; line-height:1.5; }
+    .modal .msg.err { color:#d23b3b; }
+    .modal .msg.ok { color: var(--accent-2); }
+    .modal .close { float:left; cursor:pointer; color:var(--muted); font-size:20px; border:none; background:none; }
+    .ava-colors, .ava-icons { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+    .ava-colors span { width:30px; height:30px; border-radius:50%; cursor:pointer; border:3px solid transparent; }
+    .ava-colors span.sel { border-color: var(--text); }
+    .ava-icons span { width:40px; height:40px; border-radius:11px; display:grid; place-items:center; cursor:pointer;
+      font-size:21px; background: rgba(128,128,128,.12); border:2px solid transparent; }
+    .ava-icons span.sel { border-color: var(--accent); }
+    .ava-preview { display:flex; align-items:center; gap:10px; margin:14px 0 4px; }
+    .ava-preview .av-big { width:48px; height:48px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:24px; box-shadow:var(--shadow); flex:0 0 48px; }
   </style>
 </head>
 <body data-theme="day">
@@ -158,6 +192,7 @@
       <div>ניווט שטח <small>· POC רכיב מפה</small></div>
     </div>
     <div class="top-actions">
+      <button class="icon-btn account-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
       <a class="icon-btn" href="route-planner.html" title="תכנון מסלול חי + עצירות" style="text-decoration:none">🛣️</a>
       <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
       <button class="icon-btn" id="headingBtn" title="סימולציית תנועה (heading-up)">🚗</button>
@@ -372,6 +407,11 @@
       { c:[35.34,31.84], n:"עגלת קפה בשטח", t:"קפה ☕" },
     ];
 
+    // אווטאר המשתמש — נשלט ממסך הפרופיל (R11), משותף עם מודול ה-Supabase דרך window
+    window.AVATAR_ICONS = { car:'🚗', jeep:'🚙', dog:'🐕', horse:'🐎', camel:'🐪', ibex:'🐐', fox:'🦊', eagle:'🦅' };
+    window.MY_AVATAR = { color:'#4a7c59', icon:'jeep' };
+    window.setMyAvatar = function(color, icon){ window.MY_AVATAR = { color, icon }; drawDemo(); };
+
     let demoMarkers = [];
     function drawDemo() {
       if (!map.getSource("route")) {
@@ -394,11 +434,11 @@
           .addTo(map);
         demoMarkers.push(mk);
       });
-      // אווטאר משתמש לדוגמה (R11) — ג'יפ בצבע נבחר
+      // אווטאר משתמש (R11) — צבע ואייקון נבחרים, מתעדכן ממסך הפרופיל
       const av = document.createElement("div");
       av.className = "avatar";
-      av.style.background = "#4a7c59";
-      av.textContent = "🚙";
+      av.style.background = window.MY_AVATAR.color;
+      av.textContent = window.AVATAR_ICONS[window.MY_AVATAR.icon] || "🚙";
       demoMarkers.push(new maplibregl.Marker({ element: av }).setLngLat([35.18,31.74]).addTo(map));
     }
     map.on("load", drawDemo);
@@ -418,6 +458,118 @@
       document.body.dataset.theme = night ? "day" : "night";
       e.currentTarget.textContent = night ? "🌙" : "☀️";
     };
+  </script>
+
+  <!-- מודאל חשבון: הרשמה / התחברות / פרופיל ואווטאר (R9, R11) -->
+  <div class="modal-backdrop" id="acctModal">
+    <div class="modal">
+      <button class="close" id="acctClose">✕</button>
+      <!-- מצב מנותק -->
+      <div id="authView">
+        <h3>ברוכים הבאים 🧭</h3>
+        <p class="sub">התחברו או הירשמו כדי ליצור טיולים ולהזמין חברים</p>
+        <label>אימייל</label>
+        <input type="email" id="authEmail" placeholder="name@example.com" autocomplete="email" />
+        <label>סיסמה</label>
+        <input type="password" id="authPass" placeholder="לפחות 6 תווים" autocomplete="current-password" />
+        <button class="btn" id="loginBtn">התחברות</button>
+        <button class="btn ghost" id="signupBtn">הרשמה למשתמש חדש</button>
+        <div class="msg" id="authMsg"></div>
+      </div>
+      <!-- מצב מחובר -->
+      <div id="profileView" style="display:none">
+        <h3>הפרופיל שלי</h3>
+        <p class="sub" id="profileEmail"></p>
+        <label>שם תצוגה</label>
+        <input type="text" id="dispName" placeholder="השם שלך" />
+        <div class="ava-preview">
+          <div class="av-big" id="avBig">🚙</div>
+          <div style="font-size:13px;color:var(--muted)">כך תיראו על המפה לחברי הטיול</div>
+        </div>
+        <label>צבע</label>
+        <div class="ava-colors" id="avaColors"></div>
+        <label>אייקון</label>
+        <div class="ava-icons" id="avaIcons"></div>
+        <button class="btn" id="saveProfileBtn">שמירה</button>
+        <button class="btn ghost" id="logoutBtn">התנתקות</button>
+        <div class="msg" id="profMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    import { SUPABASE_URL, SUPABASE_KEY } from './supabase-config.js';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const ICONS = window.AVATAR_ICONS;
+    const ICON_KEYS = Object.keys(ICONS);
+    const COLORS = ['#4a7c59','#c2682a','#1f6fd1','#d23b3b','#8e44ad','#e2b007','#16a085','#2c2a26'];
+    const $ = id => document.getElementById(id);
+    const modal = $('acctModal'), authView = $('authView'), profView = $('profileView');
+    let profile = { avatar_color: COLORS[0], avatar_icon: 'jeep', display_name: '' };
+
+    $('accountBtn').onclick = () => { modal.classList.add('open'); refresh(); };
+    $('acctClose').onclick = () => modal.classList.remove('open');
+    modal.onclick = e => { if (e.target === modal) modal.classList.remove('open'); };
+    const setMsg = (el, t, ok) => { el.textContent = t; el.className = 'msg ' + (ok ? 'ok' : 'err'); };
+
+    function buildPickers() {
+      const cc = $('avaColors'); cc.innerHTML = '';
+      COLORS.forEach(c => { const s = document.createElement('span'); s.style.background = c;
+        s.className = c === profile.avatar_color ? 'sel' : '';
+        s.onclick = () => { profile.avatar_color = c; buildPickers(); preview(); }; cc.appendChild(s); });
+      const ic = $('avaIcons'); ic.innerHTML = '';
+      ICON_KEYS.forEach(k => { const s = document.createElement('span'); s.textContent = ICONS[k];
+        s.className = k === profile.avatar_icon ? 'sel' : '';
+        s.onclick = () => { profile.avatar_icon = k; buildPickers(); preview(); }; ic.appendChild(s); });
+    }
+    function preview() { const b = $('avBig'); b.textContent = ICONS[profile.avatar_icon] || '🚙'; b.style.background = profile.avatar_color; }
+    function setBtnAvatar(on) { const b = $('accountBtn');
+      if (on) b.innerHTML = `<span class="ava" style="background:${profile.avatar_color}">${ICONS[profile.avatar_icon] || '🚙'}</span>`;
+      else b.textContent = '👤'; }
+
+    async function refresh() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        authView.style.display = 'none'; profView.style.display = 'block';
+        $('profileEmail').textContent = session.user.email;
+        const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (data) profile = { avatar_color: data.avatar_color || COLORS[0], avatar_icon: data.avatar_icon || 'jeep', display_name: data.display_name || '' };
+        $('dispName').value = profile.display_name || '';
+        buildPickers(); preview(); setBtnAvatar(true);
+        if (window.setMyAvatar) window.setMyAvatar(profile.avatar_color, profile.avatar_icon);
+      } else {
+        authView.style.display = 'block'; profView.style.display = 'none'; setBtnAvatar(false);
+      }
+    }
+
+    $('loginBtn').onclick = async () => {
+      const { error } = await supabase.auth.signInWithPassword({ email: $('authEmail').value.trim(), password: $('authPass').value });
+      if (error) return setMsg($('authMsg'), 'שגיאה: ' + error.message, false);
+      setMsg($('authMsg'), 'התחברת בהצלחה ✓', true); refresh();
+    };
+    $('signupBtn').onclick = async () => {
+      const { data, error } = await supabase.auth.signUp({ email: $('authEmail').value.trim(), password: $('authPass').value });
+      if (error) return setMsg($('authMsg'), 'שגיאה: ' + error.message, false);
+      if (data.session) { setMsg($('authMsg'), 'נרשמת והתחברת! ✓', true); refresh(); }
+      else setMsg($('authMsg'), 'נרשמת! נשלח מייל אישור — אשרו ואז התחברו.', true);
+    };
+    $('logoutBtn').onclick = async () => { await supabase.auth.signOut(); refresh(); };
+    $('saveProfileBtn').onclick = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      profile.display_name = $('dispName').value.trim() || 'משתמש';
+      const { error } = await supabase.from('profiles').update({
+        display_name: profile.display_name, avatar_color: profile.avatar_color, avatar_icon: profile.avatar_icon
+      }).eq('id', session.user.id);
+      if (error) return setMsg($('profMsg'), 'שגיאה בשמירה: ' + error.message, false);
+      setMsg($('profMsg'), 'נשמר ✓', true); setBtnAvatar(true);
+      if (window.setMyAvatar) window.setMyAvatar(profile.avatar_color, profile.avatar_icon);
+    };
+
+    supabase.auth.onAuthStateChange(() => refresh());
+    refresh();
   </script>
 </body>
 </html>
