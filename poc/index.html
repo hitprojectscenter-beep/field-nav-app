@@ -181,6 +181,38 @@
     .ava-icons span.sel { border-color: var(--accent); }
     .ava-preview { display:flex; align-items:center; gap:10px; margin:14px 0 4px; }
     .ava-preview .av-big { width:48px; height:48px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:24px; box-shadow:var(--shadow); flex:0 0 48px; }
+
+    /* טיולים + צ'אט + מיקום חי (R10) */
+    .trips-list { margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+    .trip-row { display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:rgba(128,128,128,.1); }
+    .trip-row .nm { flex:1; font-weight:700; font-size:14px; }
+    .trip-row button { border:none; background:var(--accent); color:#fff; border-radius:9px; padding:7px 10px; cursor:pointer; font-size:12px; font-weight:700; font-family:inherit; }
+    .trip-row button.ghost { background:transparent; color:var(--accent); }
+    .trip-row.active { outline:2px solid var(--accent); }
+    .trip-bar {
+      position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:7;
+      display:flex; align-items:center; gap:8px; padding:8px 10px;
+      background:var(--panel); backdrop-filter:var(--panel-blur); border-radius:14px; box-shadow:var(--shadow); color:var(--text);
+    }
+    .trip-bar .tb-name { font-weight:700; font-size:13px; padding:0 6px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tb-btn { border:none; background:rgba(128,128,128,.14); color:var(--text); border-radius:10px; padding:8px 11px; cursor:pointer; font-size:13px; font-weight:700; font-family:inherit; }
+    .tb-btn.on { background:var(--accent-2); color:#fff; }
+    .chat-panel {
+      position:absolute; top:0; bottom:0; left:0; z-index:25; width:min(340px,86vw);
+      background:var(--panel); backdrop-filter:var(--panel-blur); box-shadow:var(--shadow);
+      display:flex; flex-direction:column; color:var(--text);
+    }
+    .chat-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid rgba(128,128,128,.2); font-size:15px; font-weight:700; }
+    .chat-head button { border:none; background:none; cursor:pointer; font-size:18px; color:var(--muted); }
+    .chat-msgs { flex:1; overflow:auto; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+    .chat-msg { max-width:80%; padding:8px 11px; border-radius:12px; font-size:13px; background:rgba(128,128,128,.14); align-self:flex-start; }
+    .chat-msg.mine { align-self:flex-end; background:var(--accent); color:#fff; }
+    .chat-msg .who { display:block; font-size:10px; opacity:.7; margin-bottom:2px; }
+    .chat-input { display:flex; gap:8px; padding:12px 14px; border-top:1px solid rgba(128,128,128,.2); }
+    .chat-input input { flex:1; padding:10px 12px; border:1px solid rgba(128,128,128,.3); border-radius:11px; background:transparent; color:var(--text); font-family:inherit; }
+    .chat-input button { border:none; background:var(--accent); color:#fff; border-radius:11px; padding:0 16px; cursor:pointer; font-weight:700; font-family:inherit; }
+    .member-dot { width:34px; height:34px; border-radius:50%; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.35); display:grid; place-items:center; font-size:17px; color:#fff; position:relative; }
+    .member-dot .nm { position:absolute; top:34px; font-size:10px; font-weight:800; background:rgba(0,0,0,.6); color:#fff; padding:1px 5px; border-radius:6px; white-space:nowrap; }
   </style>
 </head>
 <body data-theme="day">
@@ -193,6 +225,7 @@
     </div>
     <div class="top-actions">
       <button class="icon-btn account-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
+      <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
       <a class="icon-btn" href="route-planner.html" title="תכנון מסלול חי + עצירות" style="text-decoration:none">🛣️</a>
       <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
       <button class="icon-btn" id="headingBtn" title="סימולציית תנועה (heading-up)">🚗</button>
@@ -411,6 +444,7 @@
     window.AVATAR_ICONS = { car:'🚗', jeep:'🚙', dog:'🐕', horse:'🐎', camel:'🐪', ibex:'🐐', fox:'🦊', eagle:'🦅' };
     window.MY_AVATAR = { color:'#4a7c59', icon:'jeep' };
     window.setMyAvatar = function(color, icon){ window.MY_AVATAR = { color, icon }; drawDemo(); };
+    window.__map = map;   // חשיפת המפה למודול ה-Supabase (סימוני חברי טיול חיים)
 
     let demoMarkers = [];
     function drawDemo() {
@@ -497,6 +531,41 @@
     </div>
   </div>
 
+  <!-- מודאל טיולים (R10b: יצירה, R10a: הזמנה) -->
+  <div class="modal-backdrop" id="tripsModal">
+    <div class="modal">
+      <button class="close" id="tripsClose">✕</button>
+      <h3>טיולים קבוצתיים 👥</h3>
+      <p class="sub">צרו טיול, הזמינו חברים, ונווטו יחד בזמן אמת</p>
+      <div id="tripsLoginNote" class="msg" style="display:none">התחברו תחילה (כפתור 👤) כדי לנהל טיולים.</div>
+      <div id="tripsBody">
+        <label>שם טיול חדש</label>
+        <input type="text" id="newTripName" placeholder="לדוגמה: מעיינות הגלבוע" />
+        <button class="btn" id="createTripBtn">צור טיול</button>
+        <div class="trips-list" id="tripsList"></div>
+        <div class="msg" id="tripsMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- סרגל טיול פעיל -->
+  <div class="trip-bar" id="tripBar" style="display:none">
+    <span class="tb-name" id="tbName"></span>
+    <button class="tb-btn" id="locShareBtn" title="שיתוף מיקום GPS חי">📡 מיקום</button>
+    <button class="tb-btn" id="chatToggleBtn" title="צ'אט הטיול">💬 צ'אט</button>
+    <button class="tb-btn" id="leaveTripBtn" title="סגור טיול">✕</button>
+  </div>
+
+  <!-- פאנל צ'אט (R10c) -->
+  <div class="chat-panel" id="chatPanel" style="display:none">
+    <div class="chat-head"><span id="chatTitle">צ'אט הטיול</span><button id="chatClose">✕</button></div>
+    <div class="chat-msgs" id="chatMsgs"></div>
+    <div class="chat-input">
+      <input type="text" id="chatText" placeholder="הודעה לחברי הטיול…" />
+      <button id="chatSend">שלח</button>
+    </div>
+  </div>
+
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
     import { SUPABASE_URL, SUPABASE_KEY } from './supabase-config.js';
@@ -567,6 +636,203 @@
       setMsg($('profMsg'), 'נשמר ✓', true); setBtnAvatar(true);
       if (window.setMyAvatar) window.setMyAvatar(profile.avatar_color, profile.avatar_icon);
     };
+
+    // ========================================================================
+    // טיולים, הזמנות, צ'אט ומיקום חי (R10) + חיבור GPS
+    // ========================================================================
+    const map = window.__map;
+    let currentTrip = null;
+    let geoWatchId = null;
+    let msgChannel = null, posChannel = null;
+    const memberMarkers = {};
+    const memberProfiles = {};
+
+    const tripsModal = $('tripsModal');
+    $('tripsBtn').onclick = async () => { tripsModal.classList.add('open'); await loadTrips(); };
+    $('tripsClose').onclick = () => tripsModal.classList.remove('open');
+    tripsModal.onclick = e => { if (e.target === tripsModal) tripsModal.classList.remove('open'); };
+
+    async function currentSession(){ const { data:{ session } } = await supabase.auth.getSession(); return session; }
+
+    async function loadTrips(){
+      const session = await currentSession();
+      $('tripsLoginNote').style.display = session ? 'none' : 'block';
+      $('tripsBody').style.display = session ? 'block' : 'none';
+      if(!session) return;
+      const { data, error } = await supabase.from('trips').select('id,name,owner_id').order('created_at',{ascending:false});
+      const list = $('tripsList'); list.innerHTML = '';
+      if(error){ setMsg($('tripsMsg'),'שגיאה: '+error.message,false); return; }
+      if(!data || !data.length){ list.innerHTML = '<div style="color:var(--muted);font-size:13px">אין עדיין טיולים — צרו אחד למעלה.</div>'; return; }
+      data.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'trip-row' + (currentTrip && currentTrip.id===t.id ? ' active':'');
+        row.innerHTML = `<span class="nm">${t.name}</span>`;
+        const openB = document.createElement('button'); openB.textContent='פתח';
+        openB.onclick = () => { openTrip(t); tripsModal.classList.remove('open'); };
+        const invB = document.createElement('button'); invB.className='ghost'; invB.textContent='הזמן';
+        invB.onclick = () => inviteToTrip(t);
+        row.appendChild(openB); row.appendChild(invB);
+        list.appendChild(row);
+      });
+    }
+
+    $('createTripBtn').onclick = async () => {
+      const name = $('newTripName').value.trim();
+      if(!name) return setMsg($('tripsMsg'),'הקלידו שם לטיול',false);
+      const session = await currentSession(); if(!session) return;
+      const { data, error } = await supabase.from('trips').insert({ name, owner_id: session.user.id }).select().single();
+      if(error){ setMsg($('tripsMsg'),'שגיאה: '+error.message,false); return; }
+      $('newTripName').value=''; setMsg($('tripsMsg'),'הטיול נוצר ✓',true);
+      await loadTrips(); openTrip(data);
+    };
+
+    async function inviteToTrip(trip){
+      const session = await currentSession(); if(!session) return;
+      const { data, error } = await supabase.from('invitations').insert({ trip_id: trip.id, inviter_id: session.user.id }).select('token').single();
+      if(error){ setMsg($('tripsMsg'),'שגיאה ביצירת הזמנה: '+error.message,false); return; }
+      const link = `${location.origin}${location.pathname}?join=${data.token}`;
+      try { await navigator.clipboard.writeText(link); setMsg($('tripsMsg'),'קישור הזמנה הועתק ✓ — שלחו לחבר',true); }
+      catch { prompt('העתיקו את קישור ההזמנה:', link); }
+    }
+
+    function openTrip(trip){
+      currentTrip = { id: trip.id, name: trip.name };
+      $('tbName').textContent = '🧭 ' + trip.name;
+      $('tripBar').style.display = 'flex';
+      $('chatTitle').textContent = "צ'אט · " + trip.name;
+      subscribeTrip(); loadMessages(); loadMemberPositions();
+    }
+    function leaveTrip(){
+      stopLocationShare();
+      if(msgChannel){ supabase.removeChannel(msgChannel); msgChannel=null; }
+      if(posChannel){ supabase.removeChannel(posChannel); posChannel=null; }
+      Object.values(memberMarkers).forEach(m=>m.remove());
+      for(const k in memberMarkers) delete memberMarkers[k];
+      currentTrip = null;
+      $('tripBar').style.display='none';
+      $('chatPanel').style.display='none';
+      $('chatToggleBtn').classList.remove('on');
+    }
+    $('leaveTripBtn').onclick = leaveTrip;
+
+    // ניקוי בעת התנתקות
+    $('logoutBtn').onclick = async () => { leaveTrip(); await supabase.auth.signOut(); refresh(); };
+
+    // ---- צ'אט (R10c) ----
+    $('chatToggleBtn').onclick = () => {
+      const p=$('chatPanel'); const show = p.style.display==='none';
+      p.style.display = show ? 'flex':'none';
+      $('chatToggleBtn').classList.toggle('on', show);
+    };
+    $('chatClose').onclick = () => { $('chatPanel').style.display='none'; $('chatToggleBtn').classList.remove('on'); };
+    $('chatSend').onclick = sendMessage;
+    $('chatText').onkeydown = e => { if(e.key==='Enter') sendMessage(); };
+
+    async function profileFor(uid){
+      if(memberProfiles[uid]) return memberProfiles[uid];
+      const { data } = await supabase.from('profiles').select('display_name,avatar_color,avatar_icon').eq('id',uid).single();
+      memberProfiles[uid] = data || { display_name:'משתמש', avatar_color:'#888', avatar_icon:'jeep' };
+      return memberProfiles[uid];
+    }
+    async function renderMessage(m, mine){
+      const p = await profileFor(m.user_id);
+      const el = document.createElement('div');
+      el.className = 'chat-msg' + (mine?' mine':'');
+      el.innerHTML = `<span class="who">${p.display_name}</span>${m.body.replace(/</g,'&lt;')}`;
+      const box=$('chatMsgs'); box.appendChild(el); box.scrollTop=box.scrollHeight;
+    }
+    async function loadMessages(){
+      $('chatMsgs').innerHTML='';
+      if(!currentTrip) return;
+      const session = await currentSession();
+      const { data } = await supabase.from('messages').select('*').eq('trip_id',currentTrip.id).order('created_at').limit(100);
+      (data||[]).forEach(m => renderMessage(m, session && m.user_id===session.user.id));
+    }
+    async function sendMessage(){
+      const t=$('chatText').value.trim(); if(!t||!currentTrip) return;
+      const session = await currentSession(); if(!session) return;
+      $('chatText').value='';
+      const { error } = await supabase.from('messages').insert({ trip_id:currentTrip.id, user_id:session.user.id, body:t });
+      if(error){ $('chatText').value=t; alert('שגיאה בשליחה: '+error.message); }
+    }
+
+    // ---- מיקום חי + GPS (R10d) ----
+    $('locShareBtn').onclick = () => geoWatchId===null ? startLocationShare() : stopLocationShare();
+    function startLocationShare(){
+      if(!navigator.geolocation) return alert('אין תמיכה ב-GPS בדפדפן');
+      if(!currentTrip) return;
+      $('locShareBtn').classList.add('on'); $('locShareBtn').textContent='📡 משתף…';
+      geoWatchId = navigator.geolocation.watchPosition(async pos => {
+        const session = await currentSession(); if(!session) return;
+        const { latitude:lat, longitude:lng, heading } = pos.coords;
+        map.flyTo({ center:[lng,lat] });
+        await supabase.from('live_positions').upsert({
+          trip_id: currentTrip.id, user_id: session.user.id, lat, lng,
+          heading: (heading!=null && !isNaN(heading))?heading:null, updated_at: new Date().toISOString()
+        });
+      }, err => { alert('שגיאת GPS: '+err.message); stopLocationShare(); },
+        { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+    }
+    function stopLocationShare(){
+      if(geoWatchId!==null){ navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+      $('locShareBtn').classList.remove('on'); $('locShareBtn').textContent='📡 מיקום';
+    }
+    async function loadMemberPositions(){
+      if(!currentTrip) return;
+      const { data } = await supabase.from('live_positions').select('*').eq('trip_id',currentTrip.id);
+      (data||[]).forEach(upsertMemberMarker);
+    }
+    async function upsertMemberMarker(row){
+      if(!row || row.lat==null || row.lng==null) return;
+      const session = await currentSession();
+      const isMe = session && row.user_id===session.user.id;
+      const p = await profileFor(row.user_id);
+      const color = isMe ? window.MY_AVATAR.color : p.avatar_color;
+      const icon  = ICONS[isMe?window.MY_AVATAR.icon:p.avatar_icon] || '🚙';
+      let mk = memberMarkers[row.user_id];
+      if(!mk){
+        const el = document.createElement('div');
+        el.className='member-dot'; el.style.background = color;
+        el.innerHTML = icon + `<span class="nm">${isMe?'אני':p.display_name}</span>`;
+        mk = new window.maplibregl.Marker({ element: el }).setLngLat([row.lng,row.lat]).addTo(map);
+        memberMarkers[row.user_id] = mk;
+      } else { mk.setLngLat([row.lng,row.lat]); }
+    }
+
+    function subscribeTrip(){
+      if(msgChannel) supabase.removeChannel(msgChannel);
+      if(posChannel) supabase.removeChannel(posChannel);
+      msgChannel = supabase.channel('msg:'+currentTrip.id)
+        .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:'trip_id=eq.'+currentTrip.id },
+          async payload => { const s=await currentSession(); renderMessage(payload.new, s && payload.new.user_id===s.user.id); })
+        .subscribe();
+      posChannel = supabase.channel('pos:'+currentTrip.id)
+        .on('postgres_changes', { event:'*', schema:'public', table:'live_positions', filter:'trip_id=eq.'+currentTrip.id },
+          payload => upsertMemberMarker(payload.new))
+        .subscribe();
+    }
+
+    // הצטרפות דרך קישור הזמנה ?join=<token>
+    async function handleJoin(){
+      const token = new URLSearchParams(location.search).get('join');
+      if(!token) return;
+      const session = await currentSession();
+      if(!session){
+        modal.classList.add('open');
+        setMsg($('authMsg'),'התחברו/הירשמו כדי להצטרף לטיול שהוזמנתם אליו',true);
+        const sub = supabase.auth.onAuthStateChange((_e,s)=>{ if(s){ sub.data.subscription.unsubscribe(); doRedeem(token); } });
+        return;
+      }
+      doRedeem(token);
+    }
+    async function doRedeem(token){
+      const { data, error } = await supabase.rpc('redeem_invitation', { p_token: token });
+      history.replaceState({}, '', location.pathname);
+      if(error){ alert('הצטרפות לטיול נכשלה: '+error.message); return; }
+      const { data: trip } = await supabase.from('trips').select('id,name').eq('id', data).single();
+      if(trip){ modal.classList.remove('open'); openTrip(trip); }
+    }
+    handleJoin();
 
     supabase.auth.onAuthStateChange(() => refresh());
     refresh();
