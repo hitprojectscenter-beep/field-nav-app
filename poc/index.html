@@ -265,6 +265,19 @@
     .measure-vertex { width:12px; height:12px; background:#fff; border:3px solid #1f6fd1; border-radius:50%; box-shadow:0 1px 4px rgba(0,0,0,.4); }
     .copy-coord, .nav-here { border:none; color:#fff; border-radius:8px; padding:6px 10px; margin-top:8px; cursor:pointer; font-family:inherit; font-weight:700; font-size:12px; background:var(--accent); }
     .nav-here { background:var(--accent-2); }
+
+    /* כפתור צף "הצג אותי" */
+    .showme-fab { position:absolute; bottom:22px; left:14px; z-index:6; display:flex; align-items:center; gap:8px;
+      border:none; cursor:pointer; padding:11px 16px; border-radius:26px;
+      background:var(--panel); backdrop-filter:var(--panel-blur); box-shadow:var(--shadow); color:var(--text);
+      font-family:inherit; font-weight:700; font-size:14px; transition:transform .12s, background .2s; }
+    .showme-fab .ic { font-size:17px; }
+    .showme-fab:hover { transform:translateY(-2px); }
+    .showme-fab:active { transform:scale(.95); }
+    .showme-fab.on { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; }
+    /* כפתור מחיקת מדידה בולט */
+    .chip-x.del { background:rgba(210,59,59,.16); }
+    .chip-x.del:hover { background:#d23b3b; color:#fff; }
   </style>
 </head>
 <body data-theme="day">
@@ -291,19 +304,23 @@
     <div class="hint" id="hint">בחרו כלי מהסרגל ◀ · או 🏞️ לנקודות עניין</div>
     <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="clearRouteBtn" title="נקה מסלול">✕</button></div>
     <div class="chip nav-chip" id="navInfo"><span></span><button class="chip-x" id="cancelNavBtn" title="בטל ניווט">✕</button></div>
-    <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="clearMeasureBtn" title="נקה מדידה">✕</button></div>
+    <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="undoMeasureBtn" title="בטל נקודה אחרונה">↶</button><button class="chip-x del" id="clearMeasureBtn" title="מחק מדידה">🗑️</button></div>
   </div>
   <div class="poi-status" id="poiStatus"></div>
 
   <!-- סרגל כלים (ימין): הצג אותי, ניווט אווירי, מסלול שטח, מדידות, נקודה -->
   <div class="tool-dock">
-    <button class="tool-btn" id="showMeBtn" title="הצג אותי על המפה (GPS חי)">📍</button>
     <button class="tool-btn" data-tool="bearing" title="נווט ליעד — קרן אווירית קבועה">🎯</button>
     <button class="tool-btn" data-tool="route" title="מסלול שטח ליעד">🚙</button>
     <button class="tool-btn" data-tool="distance" title="מדידת מרחק">📏</button>
     <button class="tool-btn" data-tool="area" title="מדידת שטח">⬛</button>
     <button class="tool-btn" data-tool="point" title="סמן נקודה + קואורדינטות">📌</button>
   </div>
+
+  <!-- כפתור צף בולט: הצג אותי על המפה (GPS חי) -->
+  <button class="showme-fab" id="showMeBtn" title="הצג אותי על המפה (GPS חי)">
+    <span class="ic">📍</span><span class="tx">הצג אותי</span>
+  </button>
 
   <!-- חץ צפון: ה'מחט' מסתובבת כך שתמיד מצביעה לצפון גם כשהמפה מסתובבת בתנועה -->
   <div class="north" id="north" title="צפון — לחץ ליישור צפונה">
@@ -664,16 +681,17 @@
     let myPos=null, myMarker=null, showMeWatch=null, firstFix=true;
     function startShowMe(){
       if(!navigator.geolocation) return alert('אין תמיכה ב-GPS בדפדפן');
-      firstFix=true; document.getElementById('showMeBtn').classList.add('on');
+      firstFix=true; const sb=document.getElementById('showMeBtn'); sb.classList.add('on'); sb.querySelector('.tx').textContent='מאתר…';
       showMeWatch=navigator.geolocation.watchPosition(p=>{
         myPos=[p.coords.longitude,p.coords.latitude]; startPoint=myPos;
         if(!myMarker){ const el=document.createElement('div'); el.className='me-dot'; el.innerHTML='<div class="me-pulse"></div><div class="me-core"></div>'; myMarker=new maplibregl.Marker({element:el}).setLngLat(myPos).addTo(map); }
         else myMarker.setLngLat(myPos);
+        sb.querySelector('.tx').textContent='מציג אותך ✓';
         if(firstFix){ map.easeTo({center:myPos, zoom:Math.max(map.getZoom(),14)}); firstFix=false; }
         updateBearing();
       }, e=>{ alert('שגיאת GPS: '+e.message); stopShowMe(); }, {enableHighAccuracy:true,maximumAge:3000,timeout:15000});
     }
-    function stopShowMe(){ if(showMeWatch!=null){navigator.geolocation.clearWatch(showMeWatch);showMeWatch=null;} if(myMarker){myMarker.remove();myMarker=null;} document.getElementById('showMeBtn').classList.remove('on'); }
+    function stopShowMe(){ if(showMeWatch!=null){navigator.geolocation.clearWatch(showMeWatch);showMeWatch=null;} if(myMarker){myMarker.remove();myMarker=null;} const sb=document.getElementById('showMeBtn'); sb.classList.remove('on'); sb.querySelector('.tx').textContent='הצג אותי'; }
     document.getElementById('showMeBtn').onclick=()=>{ showMeWatch===null?startShowMe():stopShowMe(); };
 
     // --- ניווט אווירי: קרן קבועה ממיקומי ליעד ---
@@ -720,7 +738,9 @@
       }
     }
     function clearMeasure(){ measurePts=[]; measureMarkers.forEach(m=>m.remove()); measureMarkers=[]; const s=map.getSource('measure'); if(s)s.setData(EMPTY); setMeasureInfo('',false); }
+    function undoMeasure(){ if(!measurePts.length) return; measurePts.pop(); const m=measureMarkers.pop(); if(m)m.remove(); measurePts.length?updateMeasure():clearMeasure(); }
     document.getElementById('clearMeasureBtn').onclick=clearMeasure;
+    document.getElementById('undoMeasureBtn').onclick=undoMeasure;
 
     // --- סימון נקודה + קואורדינטות ---
     let pointMarkers=[];
