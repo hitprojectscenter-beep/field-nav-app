@@ -477,10 +477,11 @@
       const sources = {
         base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
         dem:     { type: "raster-dem", tiles: [DEM_URL], encoding: "terrarium", tileSize: 256, maxzoom: 13 },
-        route:   { type: "geojson", data: empty },
-        nav:     { type: "geojson", data: empty },
-        measure: { type: "geojson", data: empty },
-        track:   { type: "geojson", data: empty }
+        route:      { type: "geojson", data: empty },
+        nav:        { type: "geojson", data: empty },
+        measure:    { type: "geojson", data: empty },
+        track:      { type: "geojson", data: empty },
+        savedtracks:{ type: "geojson", data: empty }
       };
       const reliefLayers = [
         { id: "hillshade", type: "hillshade", source: "dem", layout: { visibility: "none" },
@@ -517,6 +518,9 @@
           { id: "route-line", type: "line", source: "route",
             layout: { "line-cap": "round", "line-join": "round" },
             paint: { "line-color": "#c2682a", "line-width": 5, "line-opacity": 0.92 } },
+          { id: "savedtracks-line", type: "line", source: "savedtracks",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "#8e44ad", "line-width": 3, "line-opacity": 0.6, "line-dasharray": [2, 1.5] } },
           { id: "track-line", type: "line", source: "track",
             layout: { "line-cap": "round", "line-join": "round" },
             paint: { "line-color": "#8e44ad", "line-width": 5, "line-opacity": 0.95 } },
@@ -556,7 +560,7 @@
     function switchLayer(key) {
       current = key;
       map.setStyle(styleFor(key));
-      map.once("styledata", () => { applyRoute(); applyReliefState(); loadPois(); });
+      map.once("styledata", () => { applyRoute(); applyReliefState(); loadPois(); if(window.__reapplySaved) window.__reapplySaved(); });
       [...layersEl.children].forEach(c => c.classList.toggle("active", c.dataset.k === key));
       setCredit(key);
       renderLegend();
@@ -1271,6 +1275,7 @@
         $('dispName').value = profile.display_name || '';
         buildPickers(); preview(); setBtnAvatar(true);
         if (window.setMyAvatar) window.setMyAvatar(profile.avatar_color, profile.avatar_icon);
+        if (!myDataLoaded) { myDataLoaded = true; loadMyData(); }
       } else {
         authView.style.display = 'block'; profView.style.display = 'none'; setBtnAvatar(false);
       }
@@ -1537,6 +1542,32 @@
       const up=await supabase.storage.from('photos').upload(path, file, { upsert:false, contentType:file.type });
       if(up.error){ console.warn('storage:', up.error.message); return; }
       await supabase.from('photos').insert({ user_id:session.user.id, storage_path:path, lng:loc[0], lat:loc[1], taken_at:takenAt });
+    }
+
+    // ====== הצגת מסלולים ותמונות שמורים על המפה (בהתחברות) ======
+    let savedTracksData = { type:'FeatureCollection', features:[] };
+    function applySavedTracks(){ const s=map.getSource('savedtracks'); if(s) s.setData(savedTracksData); }
+    window.__reapplySaved = applySavedTracks;   // נקרא מחדש אחרי החלפת שכבה
+    let myDataLoaded = false;
+    async function loadMyData(){
+      const { data:{ session } } = await supabase.auth.getSession();
+      if(!session) return;
+      // מסלולים שמורים -> קווים על המפה
+      try{
+        const { data:tk } = await supabase.from('tracks').select('points,name').limit(50);
+        const feats=(tk||[]).filter(t=>Array.isArray(t.points)&&t.points.length>1)
+          .map(t=>({ type:'Feature', geometry:{ type:'LineString', coordinates:t.points.map(p=>[p.lng,p.lat]) } }));
+        savedTracksData={ type:'FeatureCollection', features:feats };
+        applySavedTracks();
+      }catch(e){ console.warn('load tracks', e); }
+      // תמונות שמורות -> סמנים
+      try{
+        const { data:ph } = await supabase.from('photos').select('storage_path,lat,lng,taken_at').limit(100);
+        (ph||[]).forEach(p=>{ if(p.lat==null||p.lng==null) return;
+          let url=''; try{ url=supabase.storage.from('photos').getPublicUrl(p.storage_path).data.publicUrl; }catch(_){}
+          if(url) addPhotoMarker([p.lng,p.lat], url, p.taken_at, 'שמור');
+        });
+      }catch(e){ console.warn('load photos', e); }
     }
 
     // שמירת מסלול מוקלט לענן (R4) — נחשף לסקריפט הראשי דרך window
