@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ניווט שטח · POC מפה</title>
+  <title>טיול של מארק · ניווט שטח</title>
   <script>
   (function(){
     function box(){
@@ -360,6 +360,14 @@
     .rec-fab.on { background:linear-gradient(135deg,#e53935,#b71c1c); color:#fff; animation:recPulse 1.4s ease-in-out infinite; }
     @keyframes recPulse { 0%,100%{ box-shadow:var(--shadow) } 50%{ box-shadow:0 0 0 7px rgba(229,57,53,.28) } }
     .track-chip { border-right-color:#8e44ad; }
+    /* תפריט שפות */
+    .lang-menu { position:absolute; top:66px; left:14px; z-index:31; display:none; flex-direction:column; gap:2px; padding:6px;
+      background:var(--panel); backdrop-filter:var(--panel-blur); border:1px solid var(--edge); border-radius:14px; box-shadow:var(--shadow); }
+    .lang-menu.open { display:flex; }
+    .lang-menu button { border:none; background:transparent; color:var(--text); font-size:14px; font-family:inherit; text-align:start;
+      padding:9px 14px; border-radius:10px; cursor:pointer; white-space:nowrap; }
+    .lang-menu button:hover { background:rgba(128,128,128,.14); }
+    .lang-menu button.sel { background:var(--accent); color:#fff; }
   </style>
 </head>
 <body data-theme="day">
@@ -368,7 +376,7 @@
   <div class="topbar">
     <div class="brand">
       <div class="logo">🧭</div>
-      <div>ניווט שטח <small>· POC רכיב מפה</small></div>
+      <div><span id="brandName">טיול של מארק</span> <small id="brandTag">· ניווט שטח</small></div>
     </div>
     <div class="top-actions">
       <button class="icon-btn" id="searchBtn" title="חיפוש מקום">🔎</button>
@@ -381,8 +389,18 @@
       <button class="icon-btn" id="importRouteBtn" title="ייבוא מסלול (GPX/KML)">📂</button>
       <button class="icon-btn" id="printBtn" title="הדפסת מסלול על המפה">🖨️</button>
       <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
+      <button class="icon-btn" id="langBtn" title="Language / שפה">🌐</button>
       <input type="file" accept=".gpx,.kml,application/gpx+xml,application/vnd.google-earth.kml+xml,text/xml" id="routeInput" style="display:none" />
     </div>
+  </div>
+
+  <!-- תפריט שפות -->
+  <div class="lang-menu" id="langMenu">
+    <button data-lang="he">🇮🇱 עברית</button>
+    <button data-lang="en">🇬🇧 English</button>
+    <button data-lang="fr">🇫🇷 Français</button>
+    <button data-lang="es">🇪🇸 Español</button>
+    <button data-lang="ru">🇷🇺 Русский</button>
   </div>
 
   <!-- שכבת חיפוש מקום (Nominatim/OSM) -->
@@ -450,6 +468,7 @@
       const _tb = document.getElementById('themeBtn'); if (_tb) _tb.textContent = '☀️';
     }
     let routeProfile = (SAVED && SAVED.profile) || 'car-fast';   // פרופיל ניווט (רכב שטח כברירת מחדל)
+    let curLang = (SAVED && SAVED.lang) || 'he';
     let saveTimer = null;
     function saveView(){
       clearTimeout(saveTimer);
@@ -457,10 +476,40 @@
         const c = map.getCenter();
         localStorage.setItem('fna_state', JSON.stringify({
           lng:c.lng, lat:c.lat, zoom:map.getZoom(), bearing:map.getBearing(), pitch:map.getPitch(),
-          theme:document.body.dataset.theme, profile:routeProfile
+          theme:document.body.dataset.theme, profile:routeProfile, lang:curLang
         }));
       } catch(e) {} }, 600);
     }
+
+    // ===== רב-לשוניות (i18n) =====
+    const I18N = {
+      he:{ brand:'טיול של מארק', tagline:'· ניווט שטח', tt_search:'חיפוש מקום', tt_account:'חשבון / הרשמה', tt_trips:'טיולים קבוצתיים', tt_poi:'נקודות עניין', tt_photo:'צלם / צרף תמונה', tt_legend:'מקרא', tt_import:'ייבוא מסלול (GPX/KML)', tt_print:'הדפסת מסלול', tt_theme:'יום / לילה', tt_lang:'שפה', tt_bearing:'נווט ליעד — קרן אווירית', tt_route:'מסלול שטח ליעד', tt_distance:'מדידת מרחק', tt_area:'מדידת שטח', tt_point:'סמן נקודה + קואורדינטות', fab_showme:'הצג אותי', fab_record:'הקלט מסלול', hint_main:'👆 הקישו על המפה ליעד ← מסלול שטח · 🔎 חיפוש · 🏞️ נקודות עניין', search_ph:'חיפוש מקום, יישוב או אתר…', hdr_poi:'סינון נקודות עניין', hdr_profile:'פרופיל מסלול', grp_water:'מים ומעיינות', grp_nature:'טבע ותצפית', grp_heritage:'מורשת ועתיקות', grp_tour:'תיור בשטח', rel_hillshade:'הצללת תבליט', rel_contours:'קווי גובה', rel_3d:'תלת-ממד', prof_car:'רכב שטח (4x4)', prof_hike:'הליכה / טרקים', prof_mtb:'אופני שטח', lyr_hiking:'טופוגרפי / שבילים', lyr_satellite:'צילום אוויר', lyr_street:'מפת רחוב', acc_login:'התחברות', acc_signup:'הרשמה למשתמש חדש', acc_logout:'התנתקות', acc_save:'שמירה', credits:'ℹ️ מקורות וקרדיטים' },
+      en:{ brand:"Mark's Trip", tagline:'· Field Navigation', tt_search:'Search a place', tt_account:'Account / Sign up', tt_trips:'Group trips', tt_poi:'Points of interest', tt_photo:'Take / attach photo', tt_legend:'Legend', tt_import:'Import route (GPX/KML)', tt_print:'Print route', tt_theme:'Day / Night', tt_lang:'Language', tt_bearing:'Navigate to target — bearing line', tt_route:'Off-road route to target', tt_distance:'Measure distance', tt_area:'Measure area', tt_point:'Mark point + coordinates', fab_showme:'Show me', fab_record:'Record track', hint_main:'👆 Tap the map for a destination → off-road route · 🔎 Search · 🏞️ POIs', search_ph:'Search place, town or site…', hdr_poi:'Filter points of interest', hdr_profile:'Route profile', grp_water:'Water & springs', grp_nature:'Nature & viewpoints', grp_heritage:'Heritage & antiquities', grp_tour:'Field touring', rel_hillshade:'Hillshade', rel_contours:'Contour lines', rel_3d:'3D terrain', prof_car:'Off-road vehicle (4x4)', prof_hike:'Hiking / trekking', prof_mtb:'Mountain bike', lyr_hiking:'Topo / trails', lyr_satellite:'Aerial imagery', lyr_street:'Street map', acc_login:'Log in', acc_signup:'Sign up new user', acc_logout:'Log out', acc_save:'Save', credits:'ℹ️ Sources & credits' },
+      fr:{ brand:'Le voyage de Mark', tagline:'· Navigation tout-terrain', tt_search:'Rechercher un lieu', tt_account:'Compte / Inscription', tt_trips:'Sorties de groupe', tt_poi:"Points d'intérêt", tt_photo:'Prendre / joindre une photo', tt_legend:'Légende', tt_import:'Importer un itinéraire (GPX/KML)', tt_print:"Imprimer l'itinéraire", tt_theme:'Jour / Nuit', tt_lang:'Langue', tt_bearing:'Naviguer vers la cible — ligne directe', tt_route:'Itinéraire tout-terrain', tt_distance:'Mesurer la distance', tt_area:'Mesurer la surface', tt_point:'Marquer un point + coordonnées', fab_showme:'Me localiser', fab_record:'Enregistrer', hint_main:'👆 Touchez la carte pour une destination → itinéraire · 🔎 Recherche · 🏞️ POI', search_ph:'Rechercher lieu, ville ou site…', hdr_poi:"Filtrer les points d'intérêt", hdr_profile:'Profil de route', grp_water:'Eau & sources', grp_nature:'Nature & points de vue', grp_heritage:'Patrimoine & antiquités', grp_tour:'Randonnée', rel_hillshade:'Ombrage', rel_contours:'Courbes de niveau', rel_3d:'Relief 3D', prof_car:'Tout-terrain (4x4)', prof_hike:'Randonnée', prof_mtb:'VTT', lyr_hiking:'Topo / sentiers', lyr_satellite:'Vue aérienne', lyr_street:'Plan des rues', acc_login:'Se connecter', acc_signup:"S'inscrire", acc_logout:'Se déconnecter', acc_save:'Enregistrer', credits:'ℹ️ Sources & crédits' },
+      es:{ brand:'El viaje de Mark', tagline:'· Navegación de campo', tt_search:'Buscar un lugar', tt_account:'Cuenta / Registro', tt_trips:'Viajes en grupo', tt_poi:'Puntos de interés', tt_photo:'Tomar / adjuntar foto', tt_legend:'Leyenda', tt_import:'Importar ruta (GPX/KML)', tt_print:'Imprimir ruta', tt_theme:'Día / Noche', tt_lang:'Idioma', tt_bearing:'Navegar al destino — línea directa', tt_route:'Ruta todoterreno', tt_distance:'Medir distancia', tt_area:'Medir área', tt_point:'Marcar punto + coordenadas', fab_showme:'Ubícame', fab_record:'Grabar ruta', hint_main:'👆 Toca el mapa para un destino → ruta · 🔎 Buscar · 🏞️ POI', search_ph:'Buscar lugar, pueblo o sitio…', hdr_poi:'Filtrar puntos de interés', hdr_profile:'Perfil de ruta', grp_water:'Agua y manantiales', grp_nature:'Naturaleza y miradores', grp_heritage:'Patrimonio y antigüedades', grp_tour:'Excursión', rel_hillshade:'Sombreado', rel_contours:'Curvas de nivel', rel_3d:'Relieve 3D', prof_car:'Todoterreno (4x4)', prof_hike:'Senderismo', prof_mtb:'Bici de montaña', lyr_hiking:'Topo / senderos', lyr_satellite:'Imagen aérea', lyr_street:'Mapa de calles', acc_login:'Iniciar sesión', acc_signup:'Registrar usuario', acc_logout:'Cerrar sesión', acc_save:'Guardar', credits:'ℹ️ Fuentes y créditos' },
+      ru:{ brand:'Поездка Марка', tagline:'· Навигация по местности', tt_search:'Поиск места', tt_account:'Аккаунт / Регистрация', tt_trips:'Групповые поездки', tt_poi:'Точки интереса', tt_photo:'Снять / прикрепить фото', tt_legend:'Легенда', tt_import:'Импорт маршрута (GPX/KML)', tt_print:'Печать маршрута', tt_theme:'День / Ночь', tt_lang:'Язык', tt_bearing:'Навигация к цели — прямая линия', tt_route:'Внедорожный маршрут', tt_distance:'Измерить расстояние', tt_area:'Измерить площадь', tt_point:'Отметить точку + координаты', fab_showme:'Показать меня', fab_record:'Запись трека', hint_main:'👆 Коснитесь карты для точки назначения → маршрут · 🔎 Поиск · 🏞️ POI', search_ph:'Поиск места, города или объекта…', hdr_poi:'Фильтр точек интереса', hdr_profile:'Профиль маршрута', grp_water:'Вода и источники', grp_nature:'Природа и виды', grp_heritage:'Наследие и древности', grp_tour:'Походы', rel_hillshade:'Отмывка рельефа', rel_contours:'Горизонтали', rel_3d:'3D рельеф', prof_car:'Внедорожник (4x4)', prof_hike:'Пеший', prof_mtb:'Горный велосипед', lyr_hiking:'Топо / тропы', lyr_satellite:'Аэрофото', lyr_street:'Карта улиц', acc_login:'Войти', acc_signup:'Зарегистрироваться', acc_logout:'Выйти', acc_save:'Сохранить', credits:'ℹ️ Источники и авторы' }
+    };
+    function t(k){ return (I18N[curLang] && I18N[curLang][k]) || I18N.he[k] || k; }
+    function applyI18n(){
+      document.documentElement.lang = curLang;
+      document.documentElement.dir = (curLang==='he') ? 'rtl' : 'ltr';
+      const setT=(id,k)=>{ const e=document.getElementById(id); if(e) e.title=t(k); };
+      const setX=(id,k)=>{ const e=document.getElementById(id); if(e) e.textContent=t(k); };
+      setX('brandName','brand'); setX('brandTag','tagline');
+      setT('searchBtn','tt_search'); setT('accountBtn','tt_account'); setT('tripsBtn','tt_trips'); setT('poiBtn','tt_poi'); setT('photoBtn','tt_photo'); setT('legendBtn','tt_legend'); setT('importRouteBtn','tt_import'); setT('printBtn','tt_print'); setT('themeBtn','tt_theme'); setT('langBtn','tt_lang');
+      const dt={bearing:'tt_bearing',route:'tt_route',distance:'tt_distance',area:'tt_area',point:'tt_point'};
+      document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>{ if(dt[b.dataset.tool]) b.title=t(dt[b.dataset.tool]); });
+      const sm=document.querySelector('#showMeBtn .tx'); if(sm && typeof showMeWatch!=='undefined' && showMeWatch===null) sm.textContent=t('fab_showme');
+      const rc=document.querySelector('#recBtn .tx'); if(rc && typeof recording!=='undefined' && !recording) rc.textContent=t('fab_record');
+      setT('showMeBtn','fab_showme'); setT('recBtn','fab_record');
+      const si=document.getElementById('searchInput'); if(si) si.placeholder=t('search_ph');
+      const hintEl=document.getElementById('hint'); if(hintEl && hintEl.dataset.def!=='0') hintEl.textContent=t('hint_main');
+      document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.dataset.i18n); });
+      document.querySelectorAll('.lang-menu button').forEach(b=>b.classList.toggle('sel', b.dataset.lang===curLang));
+      const cs=document.querySelector('.credits summary'); if(cs) cs.textContent=t('credits');
+      setX('loginBtn','acc_login'); setX('signupBtn','acc_signup'); setX('logoutBtn','acc_logout'); setX('saveProfileBtn','acc_save');
+    }
+    function setLang(l){ curLang=l; saveView(); applyI18n(); document.getElementById('langMenu').classList.remove('open'); }
 
     // ===== תבליט תלת-ממד: מקור גובה (DEM) חינמי + קווי גובה =====
     let DEM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
@@ -650,7 +699,7 @@
       const b = document.createElement("button");
       b.className = "layer-chip" + (key === current ? " active" : "");
       b.dataset.k = key;
-      b.innerHTML = `<span class="dot">${L.icon}</span>${L.label}`;
+      b.innerHTML = `<span class="dot">${L.icon}</span><span data-i18n="lyr_${key}">${t('lyr_'+key)}</span>`;
       b.onclick = () => switchLayer(key);
       layersEl.appendChild(b);
     });
@@ -659,14 +708,14 @@
     relDiv.style.cssText = "height:1px;background:rgba(128,128,128,.25);margin:5px 6px";
     layersEl.appendChild(relDiv);
     [
-      { id:"hillshade", icon:"🏔️", label:"הצללת תבליט" },
-      { id:"contours",  icon:"📐", label:"קווי גובה" },
-      { id:"terrain3d", icon:"⛰️", label:"תלת-ממד" }
-    ].forEach(t => {
+      { id:"hillshade", icon:"🏔️", key:"rel_hillshade" },
+      { id:"contours",  icon:"📐", key:"rel_contours" },
+      { id:"terrain3d", icon:"⛰️", key:"rel_3d" }
+    ].forEach(it => {
       const b = document.createElement("button");
-      b.className = "layer-chip"; b.dataset.relief = t.id;
-      b.innerHTML = `<span class="dot">${t.icon}</span>${t.label}`;
-      b.onclick = () => toggleRelief(t.id, b);
+      b.className = "layer-chip"; b.dataset.relief = it.id;
+      b.innerHTML = `<span class="dot">${it.icon}</span><span data-i18n="${it.key}">${t(it.key)}</span>`;
+      b.onclick = () => toggleRelief(it.id, b);
       layersEl.appendChild(b);
     });
     function toggleRelief(id, btn){
@@ -684,17 +733,17 @@
     }
     // ---- סינון קטגוריות נקודות עניין ----
     const poiDiv=document.createElement("div"); poiDiv.style.cssText="height:1px;background:rgba(128,128,128,.25);margin:5px 6px"; layersEl.appendChild(poiDiv);
-    const poiHdr=document.createElement("div"); poiHdr.textContent="סינון נקודות עניין"; poiHdr.style.cssText="font-size:11px;font-weight:800;color:var(--muted);padding:2px 10px 3px"; layersEl.appendChild(poiHdr);
+    const poiHdr=document.createElement("div"); poiHdr.dataset.i18n="hdr_poi"; poiHdr.textContent=t("hdr_poi"); poiHdr.style.cssText="font-size:11px;font-weight:800;color:var(--muted);padding:2px 10px 3px"; layersEl.appendChild(poiHdr);
     [
-      { g:"water",    icon:"💧", label:"מים ומעיינות" },
-      { g:"nature",   icon:"🌄", label:"טבע ותצפית" },
-      { g:"heritage", icon:"🏛️", label:"מורשת ועתיקות" },
-      { g:"tour",     icon:"⛺", label:"תיור בשטח" }
-    ].forEach(t=>{
+      { g:"water",    icon:"💧", key:"grp_water" },
+      { g:"nature",   icon:"🌄", key:"grp_nature" },
+      { g:"heritage", icon:"🏛️", key:"grp_heritage" },
+      { g:"tour",     icon:"⛺", key:"grp_tour" }
+    ].forEach(it=>{
       const b=document.createElement("button");
-      b.className="layer-chip active"; b.dataset.poigrp=t.g;
-      b.innerHTML=`<span class="dot">${t.icon}</span>${t.label}`;
-      b.onclick=()=>togglePoiGroup(t.g,b);
+      b.className="layer-chip active"; b.dataset.poigrp=it.g;
+      b.innerHTML=`<span class="dot">${it.icon}</span><span data-i18n="${it.key}">${t(it.key)}</span>`;
+      b.onclick=()=>togglePoiGroup(it.g,b);
       layersEl.appendChild(b);
     });
     function togglePoiGroup(g, btn){
@@ -704,17 +753,17 @@
     }
     // ---- בורר פרופיל מסלול (סוג ניווט) ----
     const npDiv=document.createElement("div"); npDiv.style.cssText="height:1px;background:rgba(128,128,128,.25);margin:5px 6px"; layersEl.appendChild(npDiv);
-    const npHdr=document.createElement("div"); npHdr.textContent="פרופיל מסלול"; npHdr.style.cssText="font-size:11px;font-weight:800;color:var(--muted);padding:2px 10px 3px"; layersEl.appendChild(npHdr);
+    const npHdr=document.createElement("div"); npHdr.dataset.i18n="hdr_profile"; npHdr.textContent=t("hdr_profile"); npHdr.style.cssText="font-size:11px;font-weight:800;color:var(--muted);padding:2px 10px 3px"; layersEl.appendChild(npHdr);
     [
-      { p:"car-fast", icon:"🚙", label:"רכב שטח (4x4)" },
-      { p:"trekking", icon:"🥾", label:"הליכה / טרקים" },
-      { p:"mtb",      icon:"🚵", label:"אופני שטח" }
-    ].forEach(t=>{
+      { p:"car-fast", icon:"🚙", key:"prof_car" },
+      { p:"trekking", icon:"🥾", key:"prof_hike" },
+      { p:"mtb",      icon:"🚵", key:"prof_mtb" }
+    ].forEach(it=>{
       const b=document.createElement("button");
-      b.className="layer-chip"+(routeProfile===t.p?" active":"");
-      b.dataset.profile=t.p;
-      b.innerHTML=`<span class="dot">${t.icon}</span>${t.label}`;
-      b.onclick=()=>setProfile(t.p);
+      b.className="layer-chip"+(routeProfile===it.p?" active":"");
+      b.dataset.profile=it.p;
+      b.innerHTML=`<span class="dot">${it.icon}</span><span data-i18n="${it.key}">${t(it.key)}</span>`;
+      b.onclick=()=>setProfile(it.p);
       layersEl.appendChild(b);
     });
     function setProfile(p){
@@ -1214,6 +1263,12 @@
       e.currentTarget.textContent = night ? "🌙" : "☀️";
       saveView();
     };
+
+    // ===== בורר שפה =====
+    document.getElementById('langBtn').onclick=(e)=>{ e.stopPropagation(); document.getElementById('langMenu').classList.toggle('open'); };
+    document.querySelectorAll('.lang-menu button').forEach(b=>{ b.onclick=()=>setLang(b.dataset.lang); });
+    document.addEventListener('click',(e)=>{ const m=document.getElementById('langMenu'); if(m && m.classList.contains('open') && !m.contains(e.target) && e.target.id!=='langBtn') m.classList.remove('open'); });
+    applyI18n();   // החלת השפה הנוכחית על כל הממשק
 
     // ===== חיפוש מקום (Nominatim / OpenStreetMap) =====
     const searchBar=document.getElementById('searchBar'), searchInput=document.getElementById('searchInput'), searchResults=document.getElementById('searchResults');
