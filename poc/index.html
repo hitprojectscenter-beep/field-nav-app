@@ -727,7 +727,7 @@
         const html=`<div class="poi-pop"><b>${name}</b><span>${def.icon} ${def.label}${desc?' · '+desc:''}</span>${extra}<br><button class="poi-route-btn" data-lng="${lng}" data-lat="${lat}">🧭 נווט לכאן</button></div>`;
         const popup=new maplibregl.Popup({offset:18}).setHTML(html);
         const mk=new maplibregl.Marker({element:div}).setLngLat([lng,lat]).setPopup(popup).addTo(map);
-        popup.on('open',()=>{ const btn=document.querySelector('.poi-route-btn'); if(btn) btn.onclick=()=>{ setDestination([+btn.dataset.lng,+btn.dataset.lat]); popup.remove(); }; });
+        popup.on('open',()=>{ const el=popup.getElement(); const btn=el&&el.querySelector('.poi-route-btn'); if(btn) btn.onclick=()=>{ setDestination([+btn.dataset.lng,+btn.dataset.lat]); popup.remove(); }; });
         poiMarkers.push(mk);
       });
       setPoiStatus(`נמצאו ${n} נקודות עניין באזור`);
@@ -850,8 +850,9 @@
       const popup=new maplibregl.Popup({offset:18}).setHTML(html);
       const mk=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(ll).setPopup(popup).addTo(map);
       pointMarkers.push(mk); mk.togglePopup();
-      popup.on('open',()=>{ const c=document.querySelector('.copy-coord'); if(c)c.onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(c.dataset.c); c.textContent='הועתק ✓'; };
-        const nh=document.querySelector('.nav-here'); if(nh)nh.onclick=()=>{ setActiveTool('bearing'); setNavTarget([+nh.dataset.lng,+nh.dataset.lat]); popup.remove(); }; });
+      popup.on('open',()=>{ const el=popup.getElement(); if(!el) return;
+        const c=el.querySelector('.copy-coord'); if(c)c.onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(c.dataset.c); c.textContent='הועתק ✓'; };
+        const nh=el.querySelector('.nav-here'); if(nh)nh.onclick=()=>{ setActiveTool('bearing'); setNavTarget([+nh.dataset.lng,+nh.dataset.lat]); popup.remove(); }; });
     }
 
     // --- בורר כלים פעיל ---
