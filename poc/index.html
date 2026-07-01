@@ -362,6 +362,25 @@
   </details>
 
   <script>
+    // ===== שמירת מצב אחרון (מיקום + ערכת נושא) בין ביקורים =====
+    let SAVED = {};
+    try { SAVED = JSON.parse(localStorage.getItem('fna_state') || '{}') || {}; } catch(e) { SAVED = {}; }
+    if (SAVED.theme === 'night') {
+      document.body.dataset.theme = 'night';
+      const _tb = document.getElementById('themeBtn'); if (_tb) _tb.textContent = '☀️';
+    }
+    let saveTimer = null;
+    function saveView(){
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { try {
+        const c = map.getCenter();
+        localStorage.setItem('fna_state', JSON.stringify({
+          lng:c.lng, lat:c.lat, zoom:map.getZoom(), bearing:map.getBearing(), pitch:map.getPitch(),
+          theme:document.body.dataset.theme
+        }));
+      } catch(e) {} }, 600);
+    }
+
     // ===== תבליט תלת-ממד: מקור גובה (DEM) חינמי + קווי גובה =====
     let DEM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
     let CONTOUR_URL = null;
@@ -490,11 +509,14 @@
     const map = new maplibregl.Map({
       container: "map",
       style: styleFor("hiking"),
-      center: [35.21, 31.77],   // ירושלים / מרכז הארץ
-      zoom: 8,
+      center: (SAVED.lng != null ? [SAVED.lng, SAVED.lat] : [35.21, 31.77]),   // מיקום אחרון / מרכז הארץ
+      zoom: (SAVED.zoom != null ? SAVED.zoom : 8),
+      bearing: SAVED.bearing || 0,
+      pitch: SAVED.pitch || 0,
       attributionControl: false,
       preserveDrawingBuffer: true   // נדרש ללכידת המפה להדפסה (R7)
     });
+    map.on("moveend", saveView);
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
 
@@ -1051,6 +1073,7 @@
       const night = document.body.dataset.theme === "night";
       document.body.dataset.theme = night ? "day" : "night";
       e.currentTarget.textContent = night ? "🌙" : "☀️";
+      saveView();
     };
   </script>
 
