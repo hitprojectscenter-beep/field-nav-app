@@ -301,15 +301,17 @@
       <button class="icon-btn" id="photoBtn" title="צלם / צרף תמונה למיקום">📷</button>
       <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" />
       <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
-      <button class="icon-btn" id="headingBtn" title="סימולציית תנועה (heading-up)">🚗</button>
+      <button class="icon-btn" id="importRouteBtn" title="ייבוא מסלול (GPX/KML)">📂</button>
+      <button class="icon-btn" id="printBtn" title="הדפסת מסלול על המפה">🖨️</button>
       <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
+      <input type="file" accept=".gpx,.kml,application/gpx+xml,application/vnd.google-earth.kml+xml,text/xml" id="routeInput" style="display:none" />
     </div>
   </div>
 
   <!-- ערימת מידע עליונה: רמז, מסלול, ניווט אווירי, מדידה -->
   <div class="info-stack">
     <div class="hint" id="hint">בחרו כלי מהסרגל ◀ · או 🏞️ לנקודות עניין</div>
-    <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="clearRouteBtn" title="נקה מסלול">✕</button></div>
+    <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="shareRouteBtn" title="שתף מסלול">🔗</button><button class="chip-x" id="routeGpxBtn" title="ייצוא GPX">⬇️</button><button class="chip-x del" id="clearRouteBtn" title="נקה מסלול">✕</button></div>
     <div class="chip nav-chip" id="navInfo"><span></span><button class="chip-x" id="cancelNavBtn" title="בטל ניווט">✕</button></div>
     <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="undoMeasureBtn" title="בטל נקודה אחרונה">↶</button><button class="chip-x del" id="clearMeasureBtn" title="מחק מדידה">🗑️</button></div>
     <div class="chip track-chip" id="trackInfo"><span></span><button class="chip-x" id="trackGpxBtn" title="ייצוא GPX">⬇️</button><button class="chip-x" id="trackSaveBtn" title="שמור לענן">💾</button><button class="chip-x del" id="trackClearBtn" title="מחק מסלול">🗑️</button></div>
@@ -436,7 +438,8 @@
       style: styleFor("hiking"),
       center: [35.21, 31.77],   // ירושלים / מרכז הארץ
       zoom: 8,
-      attributionControl: false
+      attributionControl: false,
+      preserveDrawingBuffer: true   // נדרש ללכידת המפה להדפסה (R7)
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
@@ -499,19 +502,6 @@
     map.on("load", updateNorth);
     document.getElementById("north").onclick = () => map.easeTo({ bearing: 0, pitch: 0 });
 
-    // סימולציית תנועה (heading-up): המפה מסתובבת כאילו המשתמש פונה,
-    // והחץ ממשיך להצביע צפונה — ההתנהגות הנדרשת בתנועה.
-    let headingTimer = null, hb = 0;
-    document.getElementById("headingBtn").onclick = (e) => {
-      if (headingTimer) {
-        clearInterval(headingTimer); headingTimer = null;
-        e.currentTarget.classList.remove("active");
-        map.easeTo({ bearing: 0 });
-      } else {
-        e.currentTarget.classList.add("active");
-        headingTimer = setInterval(() => { hb = (hb + 6) % 360; map.setBearing(hb); }, 120);
-      }
-    };
 
     // ===== תאריך צילום אוויר (חי מ-Esri World Imagery) =====
     const imgDateEl = document.getElementById("imgDate");
@@ -845,6 +835,97 @@
     };
     document.getElementById('trackClearBtn').onclick=()=>{ recPts=[]; const s=map.getSource('track'); if(s)s.setData(EMPTY); chipSet('trackInfo','',false); };
     document.getElementById('trackSaveBtn').onclick=()=>{ window.saveTrack ? window.saveTrack(recPts, recDist, recFinalDur) : alert('התחברו (👤) כדי לשמור לענן'); };
+
+    // ====== R6 — ייצוא / ייבוא / שיתוף מסלול (GPX/KML) ======
+    function routeCoords(){
+      const d=lastRouteData; if(!d) return [];
+      if(d.type==='FeatureCollection') return (d.features[0]&&d.features[0].geometry&&d.features[0].geometry.coordinates)||[];
+      if(d.type==='Feature') return (d.geometry&&d.geometry.coordinates)||[];
+      return [];
+    }
+    function routeGPX(){
+      const seg=routeCoords().map(p=>`<trkpt lat="${p[1]}" lon="${p[0]}"></trkpt>`).join('');
+      return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="field-nav-app" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>מסלול מתוכנן</name><trkseg>${seg}</trkseg></trk></gpx>`;
+    }
+    function downloadFile(name, text, mime){ const b=new Blob([text],{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),3000); }
+    document.getElementById('routeGpxBtn').onclick=()=>{ if(!routeCoords().length) return alert('אין מסלול לייצוא'); downloadFile('route-'+Date.now()+'.gpx', routeGPX(), 'application/gpx+xml'); };
+    document.getElementById('shareRouteBtn').onclick=async()=>{
+      if(!routeCoords().length) return alert('אין מסלול לשיתוף');
+      const gpx=routeGPX(), file=new File([gpx],'route.gpx',{type:'application/gpx+xml'});
+      try{
+        if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], title:'מסלול שטח', text:'מסלול מ-field-nav-app'});
+        else if(navigator.share) await navigator.share({title:'מסלול שטח', text:'מסלול שטח מ-field-nav-app', url:location.href});
+        else { downloadFile('route.gpx', gpx, 'application/gpx+xml'); alert('שיתוף לא נתמך בדפדפן זה — הקובץ הורד לשליחה ידנית'); }
+      }catch(e){ /* המשתמש ביטל */ }
+    };
+    // ייבוא GPX/KML
+    function parseRouteFile(text){
+      const doc=new DOMParser().parseFromString(text,'text/xml');
+      let coords=[];
+      const pts=[...doc.querySelectorAll('trkpt, rtept')];
+      if(pts.length) coords=pts.map(p=>[parseFloat(p.getAttribute('lon')),parseFloat(p.getAttribute('lat'))]);
+      else { const c=doc.querySelector('coordinates'); if(c) coords=c.textContent.trim().split(/\s+/).map(s=>{const a=s.split(',');return [parseFloat(a[0]),parseFloat(a[1])];}); }
+      return coords.filter(p=>!isNaN(p[0])&&!isNaN(p[1]));
+    }
+    const routeInput=document.getElementById('routeInput');
+    document.getElementById('importRouteBtn').onclick=()=>routeInput.click();
+    routeInput.onchange=async(e)=>{
+      const f=e.target.files&&e.target.files[0]; if(!f) return;
+      const text=await f.text(); const coords=parseRouteFile(text); routeInput.value='';
+      if(coords.length<2) return alert('לא נמצא מסלול תקין בקובץ (GPX/KML)');
+      applyRoute({type:'Feature',geometry:{type:'LineString',coordinates:coords}});
+      let d=0; for(let i=1;i<coords.length;i++) d+=haversine(coords[i-1],coords[i]);
+      setRouteInfo(`מסלול מיובא · ${fmtDist(d)}`);
+      try{ map.fitBounds(coords.reduce((b,c)=>b.extend(c),new maplibregl.LngLatBounds(coords[0],coords[0])),{padding:60}); }catch(_){}
+    };
+
+    // ====== R7 — הדפסת מסלול על המפה (הערות, רוח שמיים, קנה מידה) ======
+    function niceRound(x){ const p=Math.pow(10,Math.floor(Math.log10(x))); const f=x/p; const n=f>=5?5:f>=2?2:1; return n*p; }
+    let printing=false;
+    document.getElementById('printBtn').onclick=()=>{
+      if(printing) return;
+      const notes=prompt('הערות להדפסה (רשות):','')||'';
+      printing=true;
+      const pb=map.getBearing(), pp=map.getPitch();
+      map.jumpTo({bearing:0, pitch:0});   // הדפסה עם צפון למעלה
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ try{ doPrint(notes); }catch(e){ alert('שגיאת הדפסה: '+e.message); } map.jumpTo({bearing:pb,pitch:pp}); printing=false; }));
+    };
+    function doPrint(notes){
+      let img=''; try{ img=map.getCanvas().toDataURL('image/png'); }catch(e){ alert('לא ניתן ללכוד את המפה'); return; }
+      const lat=map.getCenter().lat, z=map.getZoom();
+      const mpp=156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,z);
+      const nice=niceRound(mpp*120), barW=Math.round(nice/mpp);
+      const scaleLabel=nice>=1000?(nice/1000)+' ק"מ':Math.round(nice)+' מ׳';
+      const coords=routeCoords(); let rd=0; for(let i=1;i<coords.length;i++) rd+=haversine(coords[i-1],coords[i]);
+      const distLabel=coords.length?('אורך מסלול: '+fmtDist(rd)):'';
+      const w=window.open('','_blank','width=900,height=1000');
+      if(!w){ alert('חוסם החלונות הקופצים מונע הדפסה — יש לאפשר חלונות קופצים'); return; }
+      const esc=s=>String(s).replace(/</g,'&lt;');
+      w.document.write(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>הדפסת מסלול</title><style>
+        body{font-family:'Segoe UI','Heebo',sans-serif;margin:0;padding:18px;color:#2c2a26}
+        h1{font-size:20px;margin:0 0 4px} .sub{color:#666;font-size:13px;margin:0 0 12px}
+        .mapwrap{position:relative;border:1px solid #ccc;border-radius:8px;overflow:hidden}
+        .mapwrap img{width:100%;display:block}
+        .north{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.92);border-radius:8px;padding:6px 9px;text-align:center;font-weight:800;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+        .north .arr{font-size:20px;color:#d23b3b;line-height:1}
+        .scale{position:absolute;bottom:12px;left:12px;background:rgba(255,255,255,.92);border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+        .scale .bar{height:7px;background:#2c2a26;border-top:2px solid #fff;margin-bottom:3px}
+        .notes{margin-top:12px;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;min-height:36px;white-space:pre-wrap}
+        .foot{margin-top:8px;color:#999;font-size:11px}
+        @media print{.noprint{display:none}body{padding:4px}}
+      </style></head><body>
+        <h1>🧭 תכנון מסלול — ניווט שטח</h1>
+        <div class="sub">${distLabel}${distLabel?' · ':''}${new Date().toLocaleString('he-IL')}</div>
+        <div class="mapwrap"><img src="${img}"/>
+          <div class="north"><div class="arr">▲</div>צפון</div>
+          <div class="scale"><div class="bar" style="width:${barW}px"></div>${scaleLabel}</div>
+        </div>
+        <div class="notes"><b>הערות:</b> ${esc(notes)||'—'}</div>
+        <div class="foot">מפת רקע: © OpenStreetMap contributors · נבנה ב-field-nav-app</div>
+        <button class="noprint" onclick="window.print()" style="margin-top:12px;padding:10px 18px;border:none;border-radius:8px;background:#c2682a;color:#fff;font-weight:700;cursor:pointer">🖨️ הדפס</button>
+      </body></html>`);
+      w.document.close(); w.focus();
+    }
 
 
     // ===== מצב יום/לילה =====
