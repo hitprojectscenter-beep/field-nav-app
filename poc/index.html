@@ -375,7 +375,7 @@
     let hillshadeOn=false, contoursOn=false, terrainOn=false;
     function applyReliefState(){
       try{ if(map.getLayer('hillshade')) map.setLayoutProperty('hillshade','visibility', hillshadeOn?'visible':'none'); }catch(e){}
-      try{ if(map.getLayer('contour-lines')) map.setLayoutProperty('contour-lines','visibility', contoursOn?'visible':'none'); }catch(e){}
+      ['contour-casing','contour-lines'].forEach(id=>{ try{ if(map.getLayer(id)) map.setLayoutProperty(id,'visibility', contoursOn?'visible':'none'); }catch(e){} });
       try{ map.setTerrain(terrainOn && map.getSource('dem') ? {source:'dem', exaggeration:1.4} : null); }catch(e){}
     }
 
@@ -444,9 +444,15 @@
       ];
       if (CONTOUR_URL) {
         sources.contours = { type: "vector", tiles: [CONTOUR_URL], maxzoom: 15 };
-        reliefLayers.push({ id: "contour-lines", type: "line", source: "contours", "source-layer": "contours",
-          layout: { visibility: "none", "line-join": "round" },
-          paint: { "line-color": "rgba(107,74,42,0.6)", "line-width": ["match", ["get", "level"], 1, 1.5, 0.6] } });
+        // מתאר כהה דק מתחת + קו לבן מעל — נראה גם על צילום אוויר וגם על טופו
+        reliefLayers.push(
+          { id: "contour-casing", type: "line", source: "contours", "source-layer": "contours",
+            layout: { visibility: "none", "line-join": "round" },
+            paint: { "line-color": "rgba(30,25,18,0.4)", "line-width": ["match", ["get", "level"], 1, 3, 1.8] } },
+          { id: "contour-lines", type: "line", source: "contours", "source-layer": "contours",
+            layout: { visibility: "none", "line-join": "round" },
+            paint: { "line-color": "rgba(255,255,255,0.95)", "line-width": ["match", ["get", "level"], 1, 1.4, 0.7] } }
+        );
       }
       return {
         version: 8,
@@ -631,13 +637,14 @@
     // R3 — קטגוריות נקודות עניין (תגיות OSM אמיתיות)
     // נקודות עניין — טקסונומיית OpenStreetMap (Map Features), מקובצת לנושאים
     const POI_DEFS = [
-      // מים
+      // מים וטבע
       { k:'natural=spring',               icon:'💧', label:'מעיין', grp:'water' },
       { k:'natural=hot_spring',           icon:'♨️', label:'מעיין חם', grp:'water' },
       { k:'waterway=waterfall',           icon:'🌊', label:'מפל', grp:'water' },
-      { k:'amenity=drinking_water',       icon:'🚰', label:'מי שתייה', grp:'water' },
-      { k:'man_made=water_well',          icon:'💦', label:'באר', grp:'water' },
-      { k:'man_made=cistern',             icon:'🪣', label:'בור מים', grp:'water' },
+      { k:'natural=cave_entrance',        icon:'🕳️', label:'מערה', grp:'nature' },
+      { k:'natural=peak',                 icon:'⛰️', label:'פסגה', grp:'nature' },
+      { k:'natural=beach',                icon:'🏖️', label:'חוף', grp:'nature' },
+      { k:'tourism=viewpoint',            icon:'🔭', label:'תצפית / מצפור', grp:'nature' },
       // מורשת ועתיקות
       { k:'historic=archaeological_site', icon:'🏛️', label:'אתר עתיקות', grp:'heritage' },
       { k:'historic=ruins',               icon:'🏚️', label:'חורבה', grp:'heritage' },
@@ -645,22 +652,12 @@
       { k:'historic=fort',                icon:'🏯', label:'מבצר', grp:'heritage' },
       { k:'historic=memorial',            icon:'🗿', label:'אנדרטה', grp:'heritage' },
       { k:'historic=tomb',                icon:'🪦', label:'קבר עתיק', grp:'heritage' },
-      // טבע ותצפית
-      { k:'natural=cave_entrance',        icon:'🕳️', label:'מערה', grp:'nature' },
-      { k:'natural=peak',                 icon:'⛰️', label:'פסגה', grp:'nature' },
-      { k:'natural=beach',                icon:'🏖️', label:'חוף', grp:'nature' },
-      { k:'tourism=viewpoint',            icon:'🔭', label:'תצפית', grp:'nature' },
-      { k:'tourism=attraction',           icon:'⭐', label:'אתר מושך', grp:'nature' },
-      // תיור ושירותים
-      { k:'tourism=picnic_site',          icon:'🧺', label:'פיקניק', grp:'service' },
-      { k:'tourism=camp_site',            icon:'⛺', label:'חניון לילה', grp:'service' },
-      { k:'tourism=wilderness_hut',       icon:'🛖', label:'בקתת שטח', grp:'service' },
-      { k:'tourism=information',          icon:'ℹ️', label:'מידע/שילוט', grp:'service' },
-      { k:'amenity=shelter',              icon:'⛱️', label:'מחסה', grp:'service' },
-      { k:'amenity=cafe',                 icon:'☕', label:'בית קפה', grp:'service' },
-      { k:'amenity=parking',              icon:'🅿️', label:'חניה', grp:'service' },
-      { k:'amenity=toilets',              icon:'🚻', label:'שירותים', grp:'service' },
-      { k:'amenity=fuel',                 icon:'⛽', label:'תחנת דלק', grp:'service' },
+      { k:'building=monastery',           icon:'⛪', label:'מנזר', grp:'heritage' },
+      { k:'historic=monastery',           icon:'⛪', label:'מנזר', grp:'heritage' },
+      // תיור בשטח
+      { k:'tourism=attraction',           icon:'⭐', label:'אתר מושך', grp:'tour' },
+      { k:'tourism=camp_site',            icon:'⛺', label:'חניון לילה', grp:'tour' },
+      { k:'tourism=wilderness_hut',       icon:'🛖', label:'בקתת שטח', grp:'tour' },
     ];
 
     function setRouteInfo(t, show=true){ const e=document.getElementById('routeInfo'); if(!e) return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; const h=document.getElementById('hint'); if(h&&show) h.style.display='none'; }
