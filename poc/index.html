@@ -267,7 +267,7 @@
     .nav-here { background:var(--accent-2); }
 
     /* כפתור צף "הצג אותי" */
-    .showme-fab { position:absolute; bottom:22px; left:14px; z-index:6; display:flex; align-items:center; gap:8px;
+    .showme-fab { position:absolute; bottom:70px; right:16px; z-index:6; display:flex; align-items:center; gap:8px;
       border:none; cursor:pointer; padding:11px 16px; border-radius:26px;
       background:var(--panel); backdrop-filter:var(--panel-blur); box-shadow:var(--shadow); color:var(--text);
       font-family:inherit; font-weight:700; font-size:14px; transition:transform .12s, background .2s; }
@@ -279,7 +279,8 @@
     .chip-x.del { background:rgba(210,59,59,.16); }
     .chip-x.del:hover { background:#d23b3b; color:#fff; }
     /* הקלטת מסלול */
-    .rec-fab { bottom:70px; }
+    .rec-fab { bottom:122px; }
+    .photo-pop img { width:100%; max-width:210px; border-radius:8px; margin-bottom:6px; display:block; }
     .rec-fab.on { background:linear-gradient(135deg,#e53935,#b71c1c); color:#fff; animation:recPulse 1.4s ease-in-out infinite; }
     @keyframes recPulse { 0%,100%{ box-shadow:var(--shadow) } 50%{ box-shadow:0 0 0 7px rgba(229,57,53,.28) } }
     .track-chip { border-right-color:#8e44ad; }
@@ -297,7 +298,8 @@
       <button class="icon-btn account-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
       <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
       <button class="icon-btn active" id="poiBtn" title="נקודות עניין: עתיקות, מעיינות, מערות, תצפיות, קפה">🏞️</button>
-      <a class="icon-btn" href="route-planner.html" title="תכנון מסלול חי + עצירות" style="text-decoration:none">🛣️</a>
+      <button class="icon-btn" id="photoBtn" title="צלם / צרף תמונה למיקום">📷</button>
+      <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" />
       <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
       <button class="icon-btn" id="headingBtn" title="סימולציית תנועה (heading-up)">🚗</button>
       <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
@@ -342,7 +344,7 @@
   <div class="layers" id="layers"></div>
   <div class="legend" id="legend"></div>
 
-  <details class="credits" open>
+  <details class="credits">
     <summary>ℹ️ מקורות וקרדיטים</summary>
     <div class="body" id="creditsBody"></div>
     <div class="imgdate" id="imgDate"></div>
@@ -698,7 +700,7 @@
       if(!navigator.geolocation) return alert('אין תמיכה ב-GPS בדפדפן');
       firstFix=true; const sb=document.getElementById('showMeBtn'); sb.classList.add('on'); sb.querySelector('.tx').textContent='מאתר…';
       showMeWatch=navigator.geolocation.watchPosition(p=>{
-        myPos=[p.coords.longitude,p.coords.latitude]; startPoint=myPos;
+        myPos=[p.coords.longitude,p.coords.latitude]; startPoint=myPos; window.__myPos=myPos;
         if(!myMarker){ const el=document.createElement('div'); el.className='me-dot'; el.innerHTML='<div class="me-pulse"></div><div class="me-core"></div>'; myMarker=new maplibregl.Marker({element:el}).setLngLat(myPos).addTo(map); }
         else myMarker.setLngLat(myPos);
         sb.querySelector('.tx').textContent='מציג אותך ✓';
@@ -1192,6 +1194,48 @@
       if(trip){ modal.classList.remove('open'); openTrip(trip); }
     }
     handleJoin();
+
+    // ====== R5 — צילום וצירוף תמונה למיקום ======
+    const photoMarkers=[];
+    const photoInput=document.getElementById('photoInput');
+    document.getElementById('photoBtn').onclick=()=>photoInput.click();
+    photoInput.onchange=async(e)=>{ const f=e.target.files&&e.target.files[0]; if(f) await handlePhoto(f); photoInput.value=''; };
+
+    async function readExif(file){
+      // ייבוא דינמי ומבודד — כשל בקריאת EXIF לא ישבור את שאר האפליקציה
+      try{
+        const exifr=(await import('https://esm.sh/exifr@7.1.3')).default;
+        const g=await exifr.gps(file).catch(()=>null);
+        const p=await exifr.parse(file,['DateTimeOriginal']).catch(()=>null);
+        return { loc:(g&&g.latitude!=null)?[g.longitude,g.latitude]:null,
+                 takenAt:(p&&p.DateTimeOriginal)?new Date(p.DateTimeOriginal).toISOString():null };
+      }catch(_){ return { loc:null, takenAt:null }; }
+    }
+    async function handlePhoto(file){
+      const { loc:exifLoc, takenAt }=await readExif(file);
+      const loc = exifLoc || window.__myPos || [map.getCenter().lng, map.getCenter().lat];
+      const src = exifLoc ? 'EXIF' : (window.__myPos ? 'מיקומך' : 'מרכז המפה');
+      const url = URL.createObjectURL(file);
+      addPhotoMarker(loc, url, takenAt, src);
+      uploadPhoto(file, loc, takenAt).catch(err=>console.warn('photo cloud:', err));
+    }
+    function addPhotoMarker(loc, url, takenAt, src){
+      const el=document.createElement('div'); el.textContent='📷';
+      el.style.cssText='font-size:24px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+      const dstr = takenAt ? new Date(takenAt).toLocaleString('he-IL') : '';
+      const html=`<div class="poi-pop photo-pop"><img src="${url}" alt="תמונה"/><b>תמונה במיקום</b><span>${loc[1].toFixed(5)}, ${loc[0].toFixed(5)} · מקור: ${src}${dstr?'<br>📅 '+dstr:''}</span></div>`;
+      const popup=new window.maplibregl.Popup({offset:18,maxWidth:'240px'}).setHTML(html);
+      const mk=new window.maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(loc).setPopup(popup).addTo(map);
+      photoMarkers.push(mk); mk.togglePopup();
+    }
+    async function uploadPhoto(file, loc, takenAt){
+      const { data:{ session } }=await supabase.auth.getSession();
+      if(!session) return; // אורח — התמונה נשארת מקומית לצפייה בלבד
+      const path=session.user.id+'/'+Date.now()+'_'+file.name.replace(/[^\w.\-]/g,'_');
+      const up=await supabase.storage.from('photos').upload(path, file, { upsert:false, contentType:file.type });
+      if(up.error){ console.warn('storage:', up.error.message); return; }
+      await supabase.from('photos').insert({ user_id:session.user.id, storage_path:path, lng:loc[0], lat:loc[1], taken_at:takenAt });
+    }
 
     // שמירת מסלול מוקלט לענן (R4) — נחשף לסקריפט הראשי דרך window
     window.saveTrack = async function(pts, distM, durS){
