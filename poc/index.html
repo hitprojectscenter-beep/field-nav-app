@@ -369,7 +369,7 @@
 
   <!-- ערימת מידע עליונה: רמז, מסלול, ניווט אווירי, מדידה -->
   <div class="info-stack">
-    <div class="hint" id="hint">בחרו כלי מהסרגל ◀ · או 🏞️ לנקודות עניין</div>
+    <div class="hint" id="hint">👆 הקישו על המפה ליעד ← מסלול שטח · 🔎 חיפוש · 🏞️ נקודות עניין</div>
     <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="shareRouteBtn" title="שתף מסלול">🔗</button><button class="chip-x" id="routeGpxBtn" title="ייצוא GPX">⬇️</button><button class="chip-x del" id="clearRouteBtn" title="נקה מסלול">✕</button></div>
     <div class="chip nav-chip" id="navInfo"><span></span><button class="chip-x" id="cancelNavBtn" title="בטל ניווט">✕</button></div>
     <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="undoMeasureBtn" title="בטל נקודה אחרונה">↶</button><button class="chip-x del" id="clearMeasureBtn" title="מחק מדידה">🗑️</button></div>
@@ -442,7 +442,7 @@
         const demSrc = new mlcontour.DemSource({ url: DEM_URL, encoding:'terrarium', maxzoom:13, worker:true });
         demSrc.setupMaplibre(maplibregl);
         DEM_URL = demSrc.sharedDemProtocolUrl;
-        CONTOUR_URL = demSrc.contourProtocolUrl({ thresholds:{11:[200,1000],12:[100,500],13:[50,250],14:[20,100],15:[10,50]}, contourLayer:'contours', elevationKey:'ele', levelKey:'level' });
+        CONTOUR_URL = demSrc.contourProtocolUrl({ thresholds:{11:[50,250],12:[25,100],13:[20,100],14:[10,50],15:[5,25]}, contourLayer:'contours', elevationKey:'ele', levelKey:'level' });
       }
     }catch(e){ console.warn('contour init failed', e); CONTOUR_URL=null; }
     let hillshadeOn=false, contoursOn=false, terrainOn=false;
@@ -820,16 +820,25 @@
     const OVERPASS_EPS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];
     let epIdx=0, poiTimer=null, poiAbort=null, lastPoiCenter=null, lastPoiZoom=null;
     function schedulePois(){ if(!poiOn) return; clearTimeout(poiTimer); poiTimer=setTimeout(()=>loadPois(),1200); }
-    async function overpass(body, signal){
+    async function overpass(body, outerSignal){
       for(let i=0;i<OVERPASS_EPS.length;i++){
         const ep=OVERPASS_EPS[(epIdx+i)%OVERPASS_EPS.length];
+        const ac=new AbortController(); let timedOut=false;
+        const to=setTimeout(()=>{ timedOut=true; ac.abort(); }, 12000);  // timeout מהיר → מעבר לשרת הבא
+        const onOuter=()=>ac.abort();
+        if(outerSignal) outerSignal.addEventListener('abort', onOuter, {once:true});
         try{
-          const r=await fetch(ep,{method:'POST',body,signal});
+          const r=await fetch(ep,{method:'POST',body,signal:ac.signal});
           if(!r.ok) continue;                 // 429/504/406 → נסה שרת אחר
           const j=JSON.parse(await r.text());  // תגובת שגיאה לא-JSON → תיזרק ותנסה אחר
           epIdx=(epIdx+i)%OVERPASS_EPS.length; // היצמד לשרת שעבד
           return j;
-        }catch(e){ if(e.name==='AbortError') throw e; }
+        }catch(e){
+          if(!timedOut && outerSignal && outerSignal.aborted) throw e;  // שאילתה חדשה גברה — עצור
+          // אחרת: timeout/כשל שרת → נסה את השרת הבא
+        }finally{
+          clearTimeout(to); if(outerSignal) outerSignal.removeEventListener('abort', onOuter);
+        }
       }
       return null;
     }
@@ -1021,10 +1030,11 @@
       const ll=[e.lngLat.lng, e.lngLat.lat];
       switch(activeTool){
         case 'bearing':  setNavTarget(ll); break;
-        case 'route':    setDestination(ll); break;
         case 'distance':
         case 'area':     addMeasurePoint(ll); break;
         case 'point':    dropPoint(ll); break;
+        case 'route':
+        default:         setDestination(ll); break;   // ברירת מחדל: הקשה = יעד + מסלול שטח
       }
     });
     map.on('moveend', schedulePois);
