@@ -474,53 +474,26 @@
     function styleFor(key) {
       const L = LAYERS[key];
       const empty = { type: "FeatureCollection", features: [] };
-      const sources = {
-        base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
-        dem:     { type: "raster-dem", tiles: [DEM_URL], encoding: "terrarium", tileSize: 256, maxzoom: 13 },
-        route:      { type: "geojson", data: empty },
-        nav:        { type: "geojson", data: empty },
-        measure:    { type: "geojson", data: empty },
-        track:      { type: "geojson", data: empty },
-        savedtracks:{ type: "geojson", data: empty }
-      };
-      const reliefLayers = [
-        { id: "hillshade", type: "hillshade", source: "dem", layout: { visibility: "none" },
-          paint: { "hillshade-exaggeration": 0.55, "hillshade-shadow-color": "#3d2f1e", "hillshade-accent-color": "#6b4a2a" } }
-      ];
-      if (CONTOUR_URL) {
-        sources.contours = { type: "vector", tiles: [CONTOUR_URL], maxzoom: 15 };
-        // מתאר כהה דק מתחת + קו לבן מעל — נראה גם על צילום אוויר וגם על טופו
-        reliefLayers.push(
-          { id: "contour-casing", type: "line", source: "contours", "source-layer": "contours",
-            layout: { visibility: "none", "line-join": "round" },
-            paint: { "line-color": "rgba(30,25,18,0.4)", "line-width": ["match", ["get", "level"], 1, 3, 1.8] } },
-          { id: "contour-lines", type: "line", source: "contours", "source-layer": "contours",
-            layout: { visibility: "none", "line-join": "round" },
-            paint: { "line-color": "rgba(255,255,255,0.95)", "line-width": ["match", ["get", "level"], 1, 1.4, 0.7] } },
-          // מספרי גובה (מ' מעל פני הים) על קווי הגובה הראשיים
-          { id: "contour-labels", type: "symbol", source: "contours", "source-layer": "contours",
-            filter: [">", ["get", "level"], 0],
-            layout: { visibility: "none", "symbol-placement": "line", "text-max-angle": 25, "symbol-spacing": 280,
-              "text-field": ["concat", ["number-format", ["get", "ele"], { "max-fraction-digits": 0 }], " m"],
-              "text-font": ["Noto Sans Regular"], "text-size": 11, "text-padding": 6, "text-rotation-alignment": "map" },
-            paint: { "text-color": "#ffffff", "text-halo-color": "rgba(30,25,18,0.9)", "text-halo-width": 1.6 } }
-        );
-      }
+      // סגנון בסיס מינימלי וחסין. שכבות התבליט (DEM/הצללה/קווי-גובה/מסלולים-שמורים)
+      // מתווספות דינמית ב-addExtras() אחרי הטעינה, עם try/catch — כך כשל בתוסף
+      // לעולם לא ישבור את מפת הבסיס והנתונים.
       return {
         version: 8,
         glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
-        sources,
+        sources: {
+          base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
+          route:   { type: "geojson", data: empty },
+          nav:     { type: "geojson", data: empty },
+          measure: { type: "geojson", data: empty },
+          track:   { type: "geojson", data: empty }
+        },
         layers: [
           { id: "base", type: "raster", source: "base" },
-          ...reliefLayers,
           { id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"],
             paint: { "fill-color": "#1f6fd1", "fill-opacity": 0.18 } },
           { id: "route-line", type: "line", source: "route",
             layout: { "line-cap": "round", "line-join": "round" },
             paint: { "line-color": "#c2682a", "line-width": 5, "line-opacity": 0.92 } },
-          { id: "savedtracks-line", type: "line", source: "savedtracks",
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: { "line-color": "#8e44ad", "line-width": 3, "line-opacity": 0.6, "line-dasharray": [2, 1.5] } },
           { id: "track-line", type: "line", source: "track",
             layout: { "line-cap": "round", "line-join": "round" },
             paint: { "line-color": "#8e44ad", "line-width": 5, "line-opacity": 0.95 } },
@@ -539,14 +512,47 @@
       style: styleFor("hiking"),
       center: (SAVED.lng != null ? [SAVED.lng, SAVED.lat] : [35.21, 31.77]),   // מיקום אחרון / מרכז הארץ
       zoom: (SAVED.zoom != null ? SAVED.zoom : 8),
-      bearing: SAVED.bearing || 0,
-      pitch: SAVED.pitch || 0,
+      bearing: 0,
+      pitch: 0,
       attributionControl: false,
       preserveDrawingBuffer: true   // נדרש ללכידת המפה להדפסה (R7)
     });
     map.on("moveend", saveView);
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
+
+    // ===== הוספת שכבות התבליט אחרי הטעינה (מוגן — לא ישבור את מפת הבסיס) =====
+    function addExtras(){
+      try{
+        if(!map.getSource('dem')) map.addSource('dem', { type:'raster-dem', tiles:[DEM_URL], encoding:'terrarium', tileSize:256, maxzoom:13 });
+        if(!map.getLayer('hillshade')) map.addLayer({ id:'hillshade', type:'hillshade', source:'dem', layout:{visibility:'none'},
+          paint:{ 'hillshade-exaggeration':0.55, 'hillshade-shadow-color':'#3d2f1e', 'hillshade-accent-color':'#6b4a2a' } }, 'route-line');
+      }catch(e){ console.warn('addExtras dem/hillshade', e); }
+      try{
+        if(CONTOUR_URL){
+          if(!map.getSource('contours')) map.addSource('contours', { type:'vector', tiles:[CONTOUR_URL], maxzoom:15 });
+          if(!map.getLayer('contour-casing')) map.addLayer({ id:'contour-casing', type:'line', source:'contours','source-layer':'contours',
+            layout:{visibility:'none','line-join':'round'}, paint:{'line-color':'rgba(30,25,18,0.4)','line-width':['match',['get','level'],1,3,1.8]} }, 'route-line');
+          if(!map.getLayer('contour-lines')) map.addLayer({ id:'contour-lines', type:'line', source:'contours','source-layer':'contours',
+            layout:{visibility:'none','line-join':'round'}, paint:{'line-color':'rgba(255,255,255,0.95)','line-width':['match',['get','level'],1,1.4,0.7]} }, 'route-line');
+          if(!map.getLayer('contour-labels')) map.addLayer({ id:'contour-labels', type:'symbol', source:'contours','source-layer':'contours',
+            filter:['>',['get','level'],0],
+            layout:{visibility:'none','symbol-placement':'line','text-max-angle':25,'symbol-spacing':280,
+              'text-field':['concat',['number-format',['get','ele'],{'max-fraction-digits':0}],' m'],
+              'text-font':['Noto Sans Regular'],'text-size':11,'text-padding':6,'text-rotation-alignment':'map'},
+            paint:{'text-color':'#ffffff','text-halo-color':'rgba(30,25,18,0.9)','text-halo-width':1.6} });
+        }
+      }catch(e){ console.warn('addExtras contours', e); CONTOUR_URL=null; }
+      try{
+        if(!map.getSource('savedtracks')) map.addSource('savedtracks', { type:'geojson', data:{type:'FeatureCollection',features:[]} });
+        if(!map.getLayer('savedtracks-line')) map.addLayer({ id:'savedtracks-line', type:'line', source:'savedtracks',
+          layout:{'line-cap':'round','line-join':'round'}, paint:{'line-color':'#8e44ad','line-width':3,'line-opacity':0.6,'line-dasharray':[2,1.5]} }, 'track-line');
+      }catch(e){ console.warn('addExtras savedtracks', e); }
+      try{ applyReliefState(); }catch(e){}
+      if(window.__reapplySaved) window.__reapplySaved();
+    }
+    map.on('load', addExtras);
+    map.on('error', e => { console.warn('MapLibre error:', e && e.error && e.error.message); });
 
     // ===== בורר שכבות =====
     let current = "hiking";
@@ -560,7 +566,7 @@
     function switchLayer(key) {
       current = key;
       map.setStyle(styleFor(key));
-      map.once("styledata", () => { applyRoute(); applyReliefState(); loadPois(); if(window.__reapplySaved) window.__reapplySaved(); });
+      map.once("styledata", () => { addExtras(); applyRoute(); loadPois(); });
       [...layersEl.children].forEach(c => c.classList.toggle("active", c.dataset.k === key));
       setCredit(key);
       renderLegend();
