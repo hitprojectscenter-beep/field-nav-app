@@ -536,16 +536,28 @@
       };
     }
 
-    const map = new maplibregl.Map({
-      container: "map",
-      style: styleFor("hiking"),
-      center: (_num(SAVED.lng) != null && _num(SAVED.lat) != null) ? [SAVED.lng, SAVED.lat] : [35.21, 31.77],   // מיקום אחרון / מרכז הארץ
-      zoom: (_num(SAVED.zoom) != null ? SAVED.zoom : 8),
-      bearing: 0,
-      pitch: 0,
-      attributionControl: false,
-      preserveDrawingBuffer: true   // נדרש ללכידת המפה להדפסה (R7)
-    });
+    let map;
+    try {
+      if (typeof maplibregl === 'undefined') throw new Error('ספריית המפה (maplibre-gl) לא נטענה — בעיית רשת/CDN');
+      map = new maplibregl.Map({
+        container: "map",
+        style: styleFor("hiking"),
+        center: (_num(SAVED.lng) != null && _num(SAVED.lat) != null) ? [SAVED.lng, SAVED.lat] : [35.21, 31.77],   // מיקום אחרון / מרכז הארץ
+        zoom: (_num(SAVED.zoom) != null ? SAVED.zoom : 8),
+        bearing: 0,
+        pitch: 0,
+        attributionControl: false,
+        preserveDrawingBuffer: true   // נדרש ללכידת המפה להדפסה (R7)
+      });
+    } catch (err) {
+      var _mc = document.getElementById('map');
+      if (_mc) _mc.innerHTML = '<div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;font-family:sans-serif;color:#b71c1c;background:#fff;direction:rtl">'
+        + '<div><div style="font-size:34px">🗺️❌</div><h3>רכיב המפה לא נטען</h3>'
+        + '<p>ייתכן שה-WebGL כבוי/לא נתמך במכשיר, או שהרשת חוסמת את טעינת ספריית המפה.</p>'
+        + '<p style="font-size:12px;color:#666">נסו: לעדכן דפדפן · לכבות מצב חיסכון בסוללה · דפדפן אחר (Chrome) · רשת אחרת</p>'
+        + '<p style="font-size:11px;color:#999;direction:ltr">' + (err && err.message || err) + '</p></div></div>';
+      throw err;
+    }
     map.on("moveend", saveView);
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
