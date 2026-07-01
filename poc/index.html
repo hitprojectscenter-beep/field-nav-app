@@ -552,15 +552,14 @@
     let startPoint = null, destPoint = null, destMarker = null;
     let poiMarkers = [], poiOn = true;
     let lastRouteData = { type:"FeatureCollection", features:[] };
-    // שכבת המסלול מוגדרת בתוך הסגנון (styleFor) ולכן תמיד קיימת — רק מעדכנים נתונים
+    // שכבת המסלול מוגדרת בתוך הסגנון (styleFor) ולכן תמיד קיימת — רק מעדכנים נתונים.
+    // חשוב: לא לקשור ל-idle/styledata! זה גורם ללולאת setData→render→idle אינסופית
+    // שמקפיאה את הדף. ההחלה נעשית ישירות אחרי חישוב/ייבוא מסלול ובהחלפת שכבה (once).
     function applyRoute(data){
       if(data) lastRouteData = data;
       const s = map.getSource("route");
       if(s) s.setData(lastRouteData);
     }
-    // החלה מחדש כשהסגנון/המקור מתייצב (קו המסלול מוגדר בתוך הסגנון)
-    map.on("styledata", () => applyRoute());
-    map.on("idle", () => applyRoute());
 
     // R3 — קטגוריות נקודות עניין (תגיות OSM אמיתיות)
     // נקודות עניין — טקסונומיית OpenStreetMap (Map Features), מקובצת לנושאים
@@ -600,13 +599,18 @@
     function setRouteInfo(t, show=true){ const e=document.getElementById('routeInfo'); if(!e) return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; const h=document.getElementById('hint'); if(h&&show) h.style.display='none'; }
     function setPoiStatus(t){ const e=document.getElementById('poiStatus'); if(e){ e.textContent=t; e.style.display=t?'block':'none'; } }
 
-    let poiTimer=null, poiAbort=null;
-    function schedulePois(){ if(!poiOn) return; clearTimeout(poiTimer); poiTimer=setTimeout(loadPois,900); }
-    async function loadPois(){
+    let poiTimer=null, poiAbort=null, lastPoiCenter=null, lastPoiZoom=null;
+    function schedulePois(){ if(!poiOn) return; clearTimeout(poiTimer); poiTimer=setTimeout(()=>loadPois(),1200); }
+    async function loadPois(force){
       if(!poiOn) return;
-      if(map.getZoom()<11){ setPoiStatus('התקרבו (זום) כדי לראות נקודות עניין'); return; }
+      const z=map.getZoom();
+      if(z<12){ setPoiStatus('התקרבו (זום) כדי לראות נקודות עניין'); return; }
+      const c=map.getCenter();
+      // דילוג אם התצוגה כמעט לא השתנתה — מונע שאילתות/רינדור מיותרים בזמן גלישה (נגד קיפאון)
+      if(!force && lastPoiCenter && Math.round(z)===lastPoiZoom && haversine([c.lng,c.lat],lastPoiCenter)<300) return;
+      lastPoiCenter=[c.lng,c.lat]; lastPoiZoom=Math.round(z);
       const b=map.getBounds(), bbox=`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
-      const body='[out:json][timeout:25];('+POI_DEFS.map(d=>{const[k,v]=d.k.split('=');return `nwr["${k}"="${v}"](${bbox});`;}).join('')+');out center 150;';
+      const body='[out:json][timeout:25];('+POI_DEFS.map(d=>{const[k,v]=d.k.split('=');return `nwr["${k}"="${v}"](${bbox});`;}).join('')+');out center 80;';
       setPoiStatus('טוען נקודות עניין…');
       try{
         if(poiAbort) poiAbort.abort();
@@ -791,7 +795,7 @@
     map.on('load', loadPois);
 
     document.getElementById('poiBtn').onclick=(e)=>{ poiOn=!poiOn; e.currentTarget.classList.toggle('active',poiOn);
-      if(poiOn) loadPois(); else { poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; setPoiStatus(''); } };
+      if(poiOn) loadPois(true); else { poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; setPoiStatus(''); } };
     document.getElementById('clearRouteBtn').onclick=clearRoute;
 
     // ====== R4 — הקלטת מסלול נסיעה ======
