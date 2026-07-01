@@ -40,7 +40,7 @@
     /* כותרת צפה */
     .topbar {
       position: absolute; top: 14px; right: 14px; left: 14px; z-index: 5;
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: flex-start; justify-content: space-between;
       pointer-events: none;
     }
     .brand {
@@ -57,7 +57,19 @@
     }
     .brand small { font-weight: 500; color: var(--muted); font-size: 12px; }
 
-    .top-actions { pointer-events: auto; display: flex; gap: 8px; }
+    .top-actions { pointer-events: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 64%; }
+
+    /* שכבת חיפוש מקום */
+    .search-bar { position:absolute; top:12px; left:12px; right:12px; z-index:30; display:none; flex-direction:column;
+      background:var(--panel); backdrop-filter:var(--panel-blur); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; }
+    .search-bar.open { display:flex; }
+    .search-row { display:flex; align-items:center; gap:8px; padding:6px 8px 6px 12px; }
+    .search-row input { flex:1; border:none; background:transparent; color:var(--text); font-size:15px; font-family:inherit; outline:none; padding:8px 4px; }
+    .search-row button { border:none; background:rgba(128,128,128,.16); color:var(--text); width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:15px; }
+    .search-results { display:flex; flex-direction:column; max-height:52vh; overflow-y:auto; }
+    .search-results .res { text-align:right; padding:10px 14px; border:none; border-top:1px solid rgba(128,128,128,.15); cursor:pointer; font-size:13.5px; color:var(--text); background:transparent; font-family:inherit; }
+    .search-results .res:hover { background:rgba(128,128,128,.12); }
+    .search-results .res small { display:block; color:var(--muted); font-size:11.5px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .icon-btn {
       width: 46px; height: 46px; border: none; cursor: pointer;
       background: var(--panel); backdrop-filter: var(--panel-blur);
@@ -304,6 +316,7 @@
       <div>ניווט שטח <small>· POC רכיב מפה</small></div>
     </div>
     <div class="top-actions">
+      <button class="icon-btn" id="searchBtn" title="חיפוש מקום">🔎</button>
       <button class="icon-btn account-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
       <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
       <button class="icon-btn active" id="poiBtn" title="נקודות עניין: עתיקות, מעיינות, מערות, תצפיות, קפה">🏞️</button>
@@ -315,6 +328,16 @@
       <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
       <input type="file" accept=".gpx,.kml,application/gpx+xml,application/vnd.google-earth.kml+xml,text/xml" id="routeInput" style="display:none" />
     </div>
+  </div>
+
+  <!-- שכבת חיפוש מקום (Nominatim/OSM) -->
+  <div class="search-bar" id="searchBar">
+    <div class="search-row">
+      <span style="font-size:16px">🔎</span>
+      <input id="searchInput" type="text" placeholder="חיפוש מקום, יישוב או אתר…" autocomplete="off" />
+      <button id="searchClose" title="סגור">✕</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
   </div>
 
   <!-- ערימת מידע עליונה: רמז, מסלול, ניווט אווירי, מדידה -->
@@ -1075,6 +1098,40 @@
       e.currentTarget.textContent = night ? "🌙" : "☀️";
       saveView();
     };
+
+    // ===== חיפוש מקום (Nominatim / OpenStreetMap) =====
+    const searchBar=document.getElementById('searchBar'), searchInput=document.getElementById('searchInput'), searchResults=document.getElementById('searchResults');
+    document.getElementById('searchBtn').onclick=()=>{ searchBar.classList.toggle('open'); if(searchBar.classList.contains('open')) searchInput.focus(); };
+    document.getElementById('searchClose').onclick=()=>{ searchBar.classList.remove('open'); searchResults.innerHTML=''; searchInput.value=''; };
+    let searchMarker=null, searchTimer=null, searchAbort=null;
+    searchInput.oninput=()=>{ clearTimeout(searchTimer); const q=searchInput.value.trim(); if(q.length<2){ searchResults.innerHTML=''; return; } searchTimer=setTimeout(()=>doSearch(q),500); };
+    async function doSearch(q){
+      searchResults.innerHTML='<div class="res">מחפש…</div>';
+      try{
+        if(searchAbort) searchAbort.abort(); searchAbort=new AbortController();
+        const url='https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=il&limit=6&accept-language=he&q='+encodeURIComponent(q);
+        const arr=await (await fetch(url,{signal:searchAbort.signal})).json();
+        if(!arr.length){ searchResults.innerHTML='<div class="res">לא נמצאו תוצאות</div>'; return; }
+        searchResults.innerHTML='';
+        arr.forEach(item=>{
+          const b=document.createElement('button'); b.className='res';
+          const name=item.name||item.display_name.split(',')[0];
+          b.innerHTML=`${name}<small>${item.display_name}</small>`;
+          b.onclick=()=>goToResult(+item.lon,+item.lat,name);
+          searchResults.appendChild(b);
+        });
+      }catch(e){ if(e.name!=='AbortError') searchResults.innerHTML='<div class="res">שגיאת חיפוש — נסו שוב</div>'; }
+    }
+    function goToResult(lng,lat,name){
+      searchBar.classList.remove('open'); searchResults.innerHTML='';
+      map.flyTo({center:[lng,lat], zoom:15});
+      if(searchMarker) searchMarker.remove();
+      const el=document.createElement('div'); el.textContent='📍'; el.style.cssText='font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+      const popup=new maplibregl.Popup({offset:20}).setHTML(`<div class="poi-pop"><b>${name}</b><button class="poi-route-btn" data-lng="${lng}" data-lat="${lat}">🧭 נווט לכאן</button></div>`);
+      searchMarker=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([lng,lat]).setPopup(popup).addTo(map);
+      searchMarker.togglePopup();
+      popup.on('open',()=>{ const el2=popup.getElement(); const btn=el2&&el2.querySelector('.poi-route-btn'); if(btn) btn.onclick=()=>{ setDestination([+btn.dataset.lng,+btn.dataset.lat]); popup.remove(); }; });
+    }
   </script>
 
   <!-- מודאל חשבון: הרשמה / התחברות / פרופיל ואווטאר (R9, R11) -->
