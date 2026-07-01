@@ -6,24 +6,32 @@
   <title>ניווט שטח · POC מפה</title>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/maplibre-contour@0.1.0/dist/index.min.js"></script>
   <style>
     :root {
-      --bg: #f4f1ea;
-      --panel: rgba(255,255,255,0.92);
-      --panel-blur: blur(12px);
-      --text: #2c2a26;
+      --bg: #eef0ec;
+      --panel: rgba(255,255,255,0.78);
+      --panel-blur: blur(18px) saturate(1.35);
+      --text: #23201c;
       --muted: #6b6256;
-      --accent: #c2682a;       /* כתום-אדמה, צבע שטח חם */
-      --accent-2: #4a7c59;     /* ירוק טבע */
-      --shadow: 0 6px 24px rgba(60,50,35,0.18);
-      --radius: 18px;
+      --accent: #d06a24;       /* כתום-אדמה חם */
+      --accent-2: #3f7d55;     /* ירוק טבע */
+      --shadow: 0 10px 34px rgba(40,32,20,0.22);
+      --radius: 20px;
+      --edge: rgba(255,255,255,0.55);
     }
     [data-theme="night"] {
-      --bg: #1a1d1f;
-      --panel: rgba(28,32,34,0.92);
-      --text: #ecebe6;
+      --bg: #14171a;
+      --panel: rgba(26,30,33,0.72);
+      --text: #eef1ee;
       --muted: #9aa0a2;
-      --shadow: 0 6px 24px rgba(0,0,0,0.5);
+      --shadow: 0 10px 34px rgba(0,0,0,0.55);
+      --edge: rgba(255,255,255,0.10);
+    }
+    /* קצה זכוכית דק לכל הפאנלים הצפים — מראה מודרני ופריך */
+    .brand, .icon-btn, .tool-dock, .layers, .legend, .credits, .chip, .hint,
+    .north, .showme-fab, .modal, .trip-bar, .chat-panel, .poi-status, .tool-btn.on {
+      border: 1px solid var(--edge);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; height: 100%; font-family: "Segoe UI", "Heebo", system-ui, sans-serif; }
@@ -353,6 +361,24 @@
   </details>
 
   <script>
+    // ===== תבליט תלת-ממד: מקור גובה (DEM) חינמי + קווי גובה =====
+    let DEM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+    let CONTOUR_URL = null;
+    try{
+      if(window.mlcontour){
+        const demSrc = new mlcontour.DemSource({ url: DEM_URL, encoding:'terrarium', maxzoom:13, worker:true });
+        demSrc.setupMaplibre(maplibregl);
+        DEM_URL = demSrc.sharedDemProtocolUrl;
+        CONTOUR_URL = demSrc.contourProtocolUrl({ thresholds:{11:[200,1000],12:[100,500],13:[50,250],14:[20,100],15:[10,50]}, contourLayer:'contours', elevationKey:'ele', levelKey:'level' });
+      }
+    }catch(e){ console.warn('contour init failed', e); CONTOUR_URL=null; }
+    let hillshadeOn=false, contoursOn=false, terrainOn=false;
+    function applyReliefState(){
+      try{ if(map.getLayer('hillshade')) map.setLayoutProperty('hillshade','visibility', hillshadeOn?'visible':'none'); }catch(e){}
+      try{ if(map.getLayer('contour-lines')) map.setLayoutProperty('contour-lines','visibility', contoursOn?'visible':'none'); }catch(e){}
+      try{ map.setTerrain(terrainOn && map.getSource('dem') ? {source:'dem', exaggeration:1.4} : null); }catch(e){}
+    }
+
     // ===== הגדרת מקורות מפה (כולם חינמיים) =====
     const LAYERS = {
       hiking: {
@@ -404,17 +430,30 @@
     function styleFor(key) {
       const L = LAYERS[key];
       const empty = { type: "FeatureCollection", features: [] };
+      const sources = {
+        base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
+        dem:     { type: "raster-dem", tiles: [DEM_URL], encoding: "terrarium", tileSize: 256, maxzoom: 13 },
+        route:   { type: "geojson", data: empty },
+        nav:     { type: "geojson", data: empty },
+        measure: { type: "geojson", data: empty },
+        track:   { type: "geojson", data: empty }
+      };
+      const reliefLayers = [
+        { id: "hillshade", type: "hillshade", source: "dem", layout: { visibility: "none" },
+          paint: { "hillshade-exaggeration": 0.55, "hillshade-shadow-color": "#3d2f1e", "hillshade-accent-color": "#6b4a2a" } }
+      ];
+      if (CONTOUR_URL) {
+        sources.contours = { type: "vector", tiles: [CONTOUR_URL], maxzoom: 15 };
+        reliefLayers.push({ id: "contour-lines", type: "line", source: "contours", "source-layer": "contours",
+          layout: { visibility: "none", "line-join": "round" },
+          paint: { "line-color": "rgba(107,74,42,0.6)", "line-width": ["match", ["get", "level"], 1, 1.5, 0.6] } });
+      }
       return {
         version: 8,
-        sources: {
-          base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
-          route:   { type: "geojson", data: empty },
-          nav:     { type: "geojson", data: empty },
-          measure: { type: "geojson", data: empty },
-          track:   { type: "geojson", data: empty }
-        },
+        sources,
         layers: [
           { id: "base", type: "raster", source: "base" },
+          ...reliefLayers,
           { id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"],
             paint: { "fill-color": "#1f6fd1", "fill-opacity": 0.18 } },
           { id: "route-line", type: "line", source: "route",
@@ -456,7 +495,7 @@
     function switchLayer(key) {
       current = key;
       map.setStyle(styleFor(key));
-      map.once("styledata", () => { applyRoute(); loadPois(); });
+      map.once("styledata", () => { applyRoute(); applyReliefState(); loadPois(); });
       [...layersEl.children].forEach(c => c.classList.toggle("active", c.dataset.k === key));
       setCredit(key);
       renderLegend();
@@ -470,6 +509,34 @@
       b.onclick = () => switchLayer(key);
       layersEl.appendChild(b);
     });
+    // ---- בקרות תבליט: הצללה, קווי גובה, תלת-ממד ----
+    const relDiv = document.createElement("div");
+    relDiv.style.cssText = "height:1px;background:rgba(128,128,128,.25);margin:5px 6px";
+    layersEl.appendChild(relDiv);
+    [
+      { id:"hillshade", icon:"🏔️", label:"הצללת תבליט" },
+      { id:"contours",  icon:"📐", label:"קווי גובה" },
+      { id:"terrain3d", icon:"⛰️", label:"תלת-ממד" }
+    ].forEach(t => {
+      const b = document.createElement("button");
+      b.className = "layer-chip"; b.dataset.relief = t.id;
+      b.innerHTML = `<span class="dot">${t.icon}</span>${t.label}`;
+      b.onclick = () => toggleRelief(t.id, b);
+      layersEl.appendChild(b);
+    });
+    function toggleRelief(id, btn){
+      if(id==="hillshade"){ hillshadeOn=!hillshadeOn; btn.classList.toggle("active", hillshadeOn); }
+      else if(id==="contours"){
+        if(!CONTOUR_URL){ setPoiStatus("קווי גובה אינם זמינים כרגע"); return; }
+        contoursOn=!contoursOn; btn.classList.toggle("active", contoursOn);
+      }
+      else if(id==="terrain3d"){
+        terrainOn=!terrainOn; btn.classList.toggle("active", terrainOn);
+        map.easeTo({ pitch: terrainOn?60:0, duration:700 });
+        if(terrainOn && !hillshadeOn){ hillshadeOn=true; const hb=document.querySelector('[data-relief=hillshade]'); if(hb) hb.classList.add("active"); }
+      }
+      applyReliefState();
+    }
     setCredit(current);
 
     // ===== מקרא (R: מפת רחוב ועוד) =====
