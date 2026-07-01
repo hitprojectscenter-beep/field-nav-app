@@ -539,18 +539,38 @@
     map.on("idle", () => applyRoute());
 
     // R3 — קטגוריות נקודות עניין (תגיות OSM אמיתיות)
+    // נקודות עניין — טקסונומיית OpenStreetMap (Map Features), מקובצת לנושאים
     const POI_DEFS = [
-      { k:'natural=spring',               icon:'💧', label:'מעיין' },
-      { k:'natural=cave_entrance',        icon:'🕳️', label:'מערה' },
-      { k:'historic=archaeological_site', icon:'🏛️', label:'אתר עתיקות' },
-      { k:'historic=ruins',               icon:'🏚️', label:'חורבה' },
-      { k:'tourism=viewpoint',            icon:'🔭', label:'תצפית' },
-      { k:'natural=peak',                 icon:'⛰️', label:'פסגה' },
-      { k:'waterway=waterfall',           icon:'🌊', label:'מפל' },
-      { k:'tourism=picnic_site',          icon:'🧺', label:'פיקניק' },
-      { k:'tourism=camp_site',            icon:'⛺', label:'חניון לילה' },
-      { k:'amenity=drinking_water',       icon:'🚰', label:'מי שתייה' },
-      { k:'amenity=cafe',                 icon:'☕', label:'בית קפה' },
+      // מים
+      { k:'natural=spring',               icon:'💧', label:'מעיין', grp:'water' },
+      { k:'natural=hot_spring',           icon:'♨️', label:'מעיין חם', grp:'water' },
+      { k:'waterway=waterfall',           icon:'🌊', label:'מפל', grp:'water' },
+      { k:'amenity=drinking_water',       icon:'🚰', label:'מי שתייה', grp:'water' },
+      { k:'man_made=water_well',          icon:'💦', label:'באר', grp:'water' },
+      { k:'man_made=cistern',             icon:'🪣', label:'בור מים', grp:'water' },
+      // מורשת ועתיקות
+      { k:'historic=archaeological_site', icon:'🏛️', label:'אתר עתיקות', grp:'heritage' },
+      { k:'historic=ruins',               icon:'🏚️', label:'חורבה', grp:'heritage' },
+      { k:'historic=castle',              icon:'🏰', label:'מצודה', grp:'heritage' },
+      { k:'historic=fort',                icon:'🏯', label:'מבצר', grp:'heritage' },
+      { k:'historic=memorial',            icon:'🗿', label:'אנדרטה', grp:'heritage' },
+      { k:'historic=tomb',                icon:'🪦', label:'קבר עתיק', grp:'heritage' },
+      // טבע ותצפית
+      { k:'natural=cave_entrance',        icon:'🕳️', label:'מערה', grp:'nature' },
+      { k:'natural=peak',                 icon:'⛰️', label:'פסגה', grp:'nature' },
+      { k:'natural=beach',                icon:'🏖️', label:'חוף', grp:'nature' },
+      { k:'tourism=viewpoint',            icon:'🔭', label:'תצפית', grp:'nature' },
+      { k:'tourism=attraction',           icon:'⭐', label:'אתר מושך', grp:'nature' },
+      // תיור ושירותים
+      { k:'tourism=picnic_site',          icon:'🧺', label:'פיקניק', grp:'service' },
+      { k:'tourism=camp_site',            icon:'⛺', label:'חניון לילה', grp:'service' },
+      { k:'tourism=wilderness_hut',       icon:'🛖', label:'בקתת שטח', grp:'service' },
+      { k:'tourism=information',          icon:'ℹ️', label:'מידע/שילוט', grp:'service' },
+      { k:'amenity=shelter',              icon:'⛱️', label:'מחסה', grp:'service' },
+      { k:'amenity=cafe',                 icon:'☕', label:'בית קפה', grp:'service' },
+      { k:'amenity=parking',              icon:'🅿️', label:'חניה', grp:'service' },
+      { k:'amenity=toilets',              icon:'🚻', label:'שירותים', grp:'service' },
+      { k:'amenity=fuel',                 icon:'⛽', label:'תחנת דלק', grp:'service' },
     ];
 
     function setRouteInfo(t, show=true){ const e=document.getElementById('routeInfo'); if(!e) return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; const h=document.getElementById('hint'); if(h&&show) h.style.display='none'; }
