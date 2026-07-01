@@ -4,6 +4,30 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ניווט שטח · POC מפה</title>
+  <script>
+  (function(){
+    function box(){
+      var b=document.getElementById('__errbox');
+      if(!b){ b=document.createElement('div'); b.id='__errbox';
+        b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b71c1c;color:#fff;font:12px/1.5 monospace;padding:10px;max-height:60vh;overflow:auto;white-space:pre-wrap;direction:ltr';
+        var btn=document.createElement('button'); btn.textContent='נקה והפעל מחדש';
+        btn.style.cssText='display:block;margin:0 0 8px;padding:8px 12px;background:#fff;color:#b71c1c;border:none;border-radius:6px;font-weight:bold;font-family:sans-serif;cursor:pointer';
+        btn.onclick=function(){ try{localStorage.clear();}catch(e){} location.href=location.pathname; };
+        b.appendChild(btn);
+        (document.body||document.documentElement).appendChild(b);
+      }
+      return b;
+    }
+    window.addEventListener('error', function(ev){
+      var m=(ev&&ev.message)||(ev&&ev.error&&ev.error.message)||(ev&&ev.target&&ev.target.src&&('טעינה נכשלה: '+ev.target.src))||'error';
+      var s=ev&&ev.filename?(' @'+String(ev.filename).split('/').pop()+':'+ev.lineno):'';
+      var d=document.createElement('div'); d.textContent='⚠ '+m+s; box().appendChild(d);
+    }, true);
+    window.addEventListener('unhandledrejection', function(ev){
+      var d=document.createElement('div'); d.textContent='⚠ promise: '+((ev.reason&&ev.reason.message)||ev.reason); box().appendChild(d);
+    });
+  })();
+  </script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/maplibre-contour@0.1.0/dist/index.min.js"></script>
@@ -388,6 +412,8 @@
     // ===== שמירת מצב אחרון (מיקום + ערכת נושא) בין ביקורים =====
     let SAVED = {};
     try { SAVED = JSON.parse(localStorage.getItem('fna_state') || '{}') || {}; } catch(e) { SAVED = {}; }
+    if (location.search.indexOf('reset') >= 0) { try { localStorage.clear(); } catch(e) {} SAVED = {}; }
+    const _num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
     if (SAVED.theme === 'night') {
       document.body.dataset.theme = 'night';
       const _tb = document.getElementById('themeBtn'); if (_tb) _tb.textContent = '☀️';
@@ -510,8 +536,8 @@
     const map = new maplibregl.Map({
       container: "map",
       style: styleFor("hiking"),
-      center: (SAVED.lng != null ? [SAVED.lng, SAVED.lat] : [35.21, 31.77]),   // מיקום אחרון / מרכז הארץ
-      zoom: (SAVED.zoom != null ? SAVED.zoom : 8),
+      center: (_num(SAVED.lng) != null && _num(SAVED.lat) != null) ? [SAVED.lng, SAVED.lat] : [35.21, 31.77],   // מיקום אחרון / מרכז הארץ
+      zoom: (_num(SAVED.zoom) != null ? SAVED.zoom : 8),
       bearing: 0,
       pitch: 0,
       attributionControl: false,
