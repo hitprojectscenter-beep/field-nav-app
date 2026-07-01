@@ -278,6 +278,11 @@
     /* כפתור מחיקת מדידה בולט */
     .chip-x.del { background:rgba(210,59,59,.16); }
     .chip-x.del:hover { background:#d23b3b; color:#fff; }
+    /* הקלטת מסלול */
+    .rec-fab { bottom:70px; }
+    .rec-fab.on { background:linear-gradient(135deg,#e53935,#b71c1c); color:#fff; animation:recPulse 1.4s ease-in-out infinite; }
+    @keyframes recPulse { 0%,100%{ box-shadow:var(--shadow) } 50%{ box-shadow:0 0 0 7px rgba(229,57,53,.28) } }
+    .track-chip { border-right-color:#8e44ad; }
   </style>
 </head>
 <body data-theme="day">
@@ -305,6 +310,7 @@
     <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="clearRouteBtn" title="נקה מסלול">✕</button></div>
     <div class="chip nav-chip" id="navInfo"><span></span><button class="chip-x" id="cancelNavBtn" title="בטל ניווט">✕</button></div>
     <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="undoMeasureBtn" title="בטל נקודה אחרונה">↶</button><button class="chip-x del" id="clearMeasureBtn" title="מחק מדידה">🗑️</button></div>
+    <div class="chip track-chip" id="trackInfo"><span></span><button class="chip-x" id="trackGpxBtn" title="ייצוא GPX">⬇️</button><button class="chip-x" id="trackSaveBtn" title="שמור לענן">💾</button><button class="chip-x del" id="trackClearBtn" title="מחק מסלול">🗑️</button></div>
   </div>
   <div class="poi-status" id="poiStatus"></div>
 
@@ -320,6 +326,11 @@
   <!-- כפתור צף בולט: הצג אותי על המפה (GPS חי) -->
   <button class="showme-fab" id="showMeBtn" title="הצג אותי על המפה (GPS חי)">
     <span class="ic">📍</span><span class="tx">הצג אותי</span>
+  </button>
+
+  <!-- כפתור הקלטת מסלול נסיעה (R4) -->
+  <button class="showme-fab rec-fab" id="recBtn" title="הקלטת מסלול נסיעה">
+    <span class="ic">🔴</span><span class="tx">הקלט מסלול</span>
   </button>
 
   <!-- חץ צפון: ה'מחט' מסתובבת כך שתמיד מצביעה לצפון גם כשהמפה מסתובבת בתנועה -->
@@ -395,7 +406,8 @@
           base:    { type: "raster", tiles: L.tiles, tileSize: 256, maxzoom: L.maxzoom, attribution: "" },
           route:   { type: "geojson", data: empty },
           nav:     { type: "geojson", data: empty },
-          measure: { type: "geojson", data: empty }
+          measure: { type: "geojson", data: empty },
+          track:   { type: "geojson", data: empty }
         },
         layers: [
           { id: "base", type: "raster", source: "base" },
@@ -404,6 +416,9 @@
           { id: "route-line", type: "line", source: "route",
             layout: { "line-cap": "round", "line-join": "round" },
             paint: { "line-color": "#c2682a", "line-width": 5, "line-opacity": 0.92 } },
+          { id: "track-line", type: "line", source: "track",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "#8e44ad", "line-width": 5, "line-opacity": 0.95 } },
           { id: "measure-line", type: "line", source: "measure",
             layout: { "line-cap": "round", "line-join": "round" },
             paint: { "line-color": "#1f6fd1", "line-width": 3, "line-dasharray": [2, 1.5] } },
@@ -787,6 +802,48 @@
       if(poiOn) loadPois(); else { poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; setPoiStatus(''); } };
     document.getElementById('clearRouteBtn').onclick=clearRoute;
 
+    // ====== R4 — הקלטת מסלול נסיעה ======
+    let recording=false, recWatch=null, recPts=[], recDist=0, recLast=null, recStart=0, recTimer=null, recFinalDur=0;
+    const recBtn=document.getElementById('recBtn');
+    const fmtDur=s=>{ const h=Math.floor(s/3600), m=Math.floor(s%3600/60), ss=s%60, p=n=>String(n).padStart(2,'0'); return h?`${h}:${p(m)}:${p(ss)}`:`${m}:${p(ss)}`; };
+    function recLabel(){ recBtn.querySelector('.tx').textContent = recording ? ('עצור · '+fmtDist(recDist)) : 'הקלט מסלול'; }
+    function recStats(){ chipSet('trackInfo', `🎬 מקליט · ${fmtDist(recDist)} · ${fmtDur(Math.floor((Date.now()-recStart)/1000))} · ${recPts.length} נק׳`, true); recLabel(); }
+    function recSaveBtns(show){ ['trackGpxBtn','trackSaveBtn','trackClearBtn'].forEach(id=>document.getElementById(id).style.display=show?'':'none'); }
+    function startRec(){
+      if(!navigator.geolocation) return alert('אין תמיכה ב-GPS בדפדפן');
+      recording=true; recPts=[]; recDist=0; recLast=null; recStart=Date.now();
+      recBtn.classList.add('on'); recSaveBtns(false); recStats();
+      recTimer=setInterval(recStats,1000);
+      recWatch=navigator.geolocation.watchPosition(p=>{
+        const pt=[p.coords.longitude,p.coords.latitude];
+        if(recLast){ const d=haversine(recLast,pt); if(d<4) return; recDist+=d; }
+        recLast=pt; recPts.push({lng:pt[0],lat:pt[1],ele:p.coords.altitude,t:new Date().toISOString()});
+        const s=map.getSource('track'); if(s) s.setData({type:'Feature',geometry:{type:'LineString',coordinates:recPts.map(x=>[x.lng,x.lat])}});
+        map.easeTo({center:pt}); recStats();
+      }, e=>{ alert('שגיאת GPS: '+e.message); stopRec(); }, {enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+    }
+    function stopRec(){
+      recording=false; if(recWatch!=null){navigator.geolocation.clearWatch(recWatch);recWatch=null;} if(recTimer){clearInterval(recTimer);recTimer=null;}
+      recBtn.classList.remove('on'); recLabel();
+      recFinalDur=Math.floor((Date.now()-recStart)/1000);
+      if(recPts.length<2){ chipSet('trackInfo','',false); return; }
+      chipSet('trackInfo', `🎬 מסלול: ${fmtDist(recDist)} · ${fmtDur(recFinalDur)} · ${recPts.length} נק׳`, true);
+      recSaveBtns(true);
+    }
+    recBtn.onclick=()=> recording?stopRec():startRec();
+    function trackGPX(){
+      const pts=recPts.map(x=>`<trkpt lat="${x.lat}" lon="${x.lng}">${x.ele!=null?`<ele>${x.ele.toFixed(1)}</ele>`:''}<time>${x.t}</time></trkpt>`).join('');
+      return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="field-nav-app" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>מסלול ${new Date().toLocaleString('he-IL')}</name><trkseg>${pts}</trkseg></trk></gpx>`;
+    }
+    document.getElementById('trackGpxBtn').onclick=()=>{
+      const blob=new Blob([trackGPX()],{type:'application/gpx+xml'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='track-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.gpx'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+    };
+    document.getElementById('trackClearBtn').onclick=()=>{ recPts=[]; const s=map.getSource('track'); if(s)s.setData(EMPTY); chipSet('trackInfo','',false); };
+    document.getElementById('trackSaveBtn').onclick=()=>{ window.saveTrack ? window.saveTrack(recPts, recDist, recFinalDur) : alert('התחברו (👤) כדי לשמור לענן'); };
+
 
     // ===== מצב יום/לילה =====
     document.getElementById("themeBtn").onclick = (e) => {
@@ -1135,6 +1192,15 @@
       if(trip){ modal.classList.remove('open'); openTrip(trip); }
     }
     handleJoin();
+
+    // שמירת מסלול מוקלט לענן (R4) — נחשף לסקריפט הראשי דרך window
+    window.saveTrack = async function(pts, distM, durS){
+      const { data:{ session } } = await supabase.auth.getSession();
+      if(!session){ alert('התחברו (👤) כדי לשמור מסלול לענן'); return; }
+      const name = 'מסלול ' + new Date().toLocaleDateString('he-IL');
+      const { error } = await supabase.from('tracks').insert({ user_id: session.user.id, name, points: pts, distance_m: distM, duration_s: durS });
+      alert(error ? ('שגיאה בשמירה: '+error.message) : 'המסלול נשמר לענן ✓');
+    };
 
     supabase.auth.onAuthStateChange(() => refresh());
     refresh();
