@@ -392,6 +392,7 @@
       document.body.dataset.theme = 'night';
       const _tb = document.getElementById('themeBtn'); if (_tb) _tb.textContent = '☀️';
     }
+    let routeProfile = (SAVED && SAVED.profile) || 'car-fast';   // פרופיל ניווט (רכב שטח כברירת מחדל)
     let saveTimer = null;
     function saveView(){
       clearTimeout(saveTimer);
@@ -399,7 +400,7 @@
         const c = map.getCenter();
         localStorage.setItem('fna_state', JSON.stringify({
           lng:c.lng, lat:c.lat, zoom:map.getZoom(), bearing:map.getBearing(), pitch:map.getPitch(),
-          theme:document.body.dataset.theme
+          theme:document.body.dataset.theme, profile:routeProfile
         }));
       } catch(e) {} }, 600);
     }
@@ -617,6 +618,27 @@
       btn.classList.toggle("active", activePoiGroups.has(g));
       if(poiOn) loadPois(true);
     }
+    // ---- בורר פרופיל מסלול (סוג ניווט) ----
+    const npDiv=document.createElement("div"); npDiv.style.cssText="height:1px;background:rgba(128,128,128,.25);margin:5px 6px"; layersEl.appendChild(npDiv);
+    const npHdr=document.createElement("div"); npHdr.textContent="פרופיל מסלול"; npHdr.style.cssText="font-size:11px;font-weight:800;color:var(--muted);padding:2px 10px 3px"; layersEl.appendChild(npHdr);
+    [
+      { p:"car-fast", icon:"🚙", label:"רכב שטח (4x4)" },
+      { p:"trekking", icon:"🥾", label:"הליכה / טרקים" },
+      { p:"mtb",      icon:"🚵", label:"אופני שטח" }
+    ].forEach(t=>{
+      const b=document.createElement("button");
+      b.className="layer-chip"+(routeProfile===t.p?" active":"");
+      b.dataset.profile=t.p;
+      b.innerHTML=`<span class="dot">${t.icon}</span>${t.label}`;
+      b.onclick=()=>setProfile(t.p);
+      layersEl.appendChild(b);
+    });
+    function setProfile(p){
+      routeProfile=p;
+      document.querySelectorAll('[data-profile]').forEach(x=>x.classList.toggle("active", x.dataset.profile===p));
+      saveView();
+      if(destPoint){ const start=startPoint||[map.getCenter().lng,map.getCenter().lat]; routeTo(start,destPoint); }
+    }
     setCredit(current);
 
     // ===== מקרא (R: מפת רחוב ועוד) =====
@@ -813,7 +835,7 @@
     }
     async function routeTo(start,dest){
       setRouteInfo('מחשב מסלול שטח…');
-      const url=`https://brouter.de/brouter?lonlats=${start[0].toFixed(5)},${start[1].toFixed(5)}|${dest[0].toFixed(5)},${dest[1].toFixed(5)}&profile=trekking&alternativeidx=0&format=geojson`;
+      const url=`https://brouter.de/brouter?lonlats=${start[0].toFixed(5)},${start[1].toFixed(5)}|${dest[0].toFixed(5)},${dest[1].toFixed(5)}&profile=${routeProfile}&alternativeidx=0&format=geojson`;
       try{
         const j=await (await fetch(url)).json();
         if(!j.features||!j.features.length){ setRouteInfo('לא נמצא מסלול שטח בין הנקודות'); return; }
