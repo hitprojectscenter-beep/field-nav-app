@@ -28,6 +28,34 @@
     });
   })();
   </script>
+  <script>
+  /* בדיקת חיבורים: פתיחת ?diag=1 מריצה בדיקה של כל השירותים החיצוניים */
+  window.addEventListener('DOMContentLoaded', function(){
+    if(!/[?&]diag/.test(location.search)) return;
+    var p=document.createElement('div');
+    p.style.cssText='position:fixed;inset:0;z-index:100000;background:#0d0d0d;color:#ddd;font:13px/1.8 monospace;padding:16px;overflow:auto;direction:ltr';
+    p.innerHTML='<b style="color:#fff;font-size:16px">🔧 בדיקת חיבורים · field-nav-app</b><br><span style="color:#888">מריץ… המתן ~20 שניות</span><br><br>';
+    document.body.appendChild(p);
+    function log(n,ok,ex){ var c=ok===true?'#5f5':ok===null?'#fd5':'#f66',i=ok===true?'✓':ok===null?'…':'✗'; var d=document.createElement('div'); d.style.color=c; d.textContent=i+' '+n+(ex?'  ('+ex+')':''); p.appendChild(d); }
+    function conn(n,u){ return fetch(u,{mode:'no-cors',cache:'no-store'}).then(function(){log(n,true,'reachable')},function(e){log(n,false,'BLOCKED: '+e.message)}); }
+    function api(n,u,o){ return fetch(u,o).then(function(r){log(n, r.status<500, 'HTTP '+r.status)},function(e){log(n,false,'BLOCKED: '+e.message)}); }
+    (async function(){
+      log('WebGL בדפדפן', (function(){try{var c=document.createElement('canvas');return !!(c.getContext('webgl')||c.getContext('experimental-webgl'))}catch(e){return false}})());
+      log('ספריית קווי גובה (mlcontour)', !!window.mlcontour);
+      await conn('מפת בסיס — Israel Hiking','https://israelhiking.osm.org.il/Hebrew/Tiles/8/153/104.png');
+      await conn('סאטלייט — Esri','https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/8/104/153');
+      await conn('קווי גובה DEM — AWS','https://s3.amazonaws.com/elevation-tiles-prod/terrarium/8/153/104.png');
+      await api('נקודות עניין — Overpass (ראשי)','https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%3Bout%201%3B');
+      await api('נקודות עניין — Overpass (kumi)','https://overpass.kumi.systems/api/interpreter?data=%5Bout%3Ajson%5D%3Bout%201%3B');
+      await api('נקודות עניין — Overpass (coffee)','https://overpass.private.coffee/api/interpreter?data=%5Bout%3Ajson%5D%3Bout%201%3B');
+      await api('מסלול — BRouter','https://brouter.de/brouter?lonlats=35.0,31.7%7C35.05,31.75&profile=trekking&format=geojson');
+      await api('גופנים — openmaptiles','https://fonts.openmaptiles.org/Noto%20Sans%20Regular/0-255.pbf');
+      await api('ענן — Supabase','https://dxfxpsfhjfygxrkitnob.supabase.co/rest/v1/trips?select=id&limit=1',{headers:{apikey:'sb_publishable_mrxqAF43tH7TSoHxnWIrVQ_fVScbqxV'}});
+      var d=document.createElement('div'); d.style.cssText='color:#fff;margin-top:14px'; d.innerHTML='— סיום. צלם/י את המסך הזה ושלח/י לי —'; p.appendChild(d);
+      var b=document.createElement('button'); b.textContent='חזרה לאפליקציה'; b.style.cssText='margin-top:10px;padding:9px 16px;font-size:14px;cursor:pointer;border:none;border-radius:6px'; b.onclick=function(){location.href=location.pathname}; p.appendChild(b);
+    })();
+  });
+  </script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>window.maplibregl||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"><\/script>')</script>
