@@ -599,8 +599,23 @@
     function setRouteInfo(t, show=true){ const e=document.getElementById('routeInfo'); if(!e) return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; const h=document.getElementById('hint'); if(h&&show) h.style.display='none'; }
     function setPoiStatus(t){ const e=document.getElementById('poiStatus'); if(e){ e.textContent=t; e.style.display=t?'block':'none'; } }
 
-    let poiTimer=null, poiAbort=null, lastPoiCenter=null, lastPoiZoom=null;
+    // מספר שרתי Overpass — מעבר-גיבוי אוטומטי כשאחד עמוס/נופל
+    const OVERPASS_EPS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+    let epIdx=0, poiTimer=null, poiAbort=null, lastPoiCenter=null, lastPoiZoom=null;
     function schedulePois(){ if(!poiOn) return; clearTimeout(poiTimer); poiTimer=setTimeout(()=>loadPois(),1200); }
+    async function overpass(body, signal){
+      for(let i=0;i<OVERPASS_EPS.length;i++){
+        const ep=OVERPASS_EPS[(epIdx+i)%OVERPASS_EPS.length];
+        try{
+          const r=await fetch(ep,{method:'POST',body,signal});
+          if(!r.ok) continue;                 // 429/504/406 → נסה שרת אחר
+          const j=JSON.parse(await r.text());  // תגובת שגיאה לא-JSON → תיזרק ותנסה אחר
+          epIdx=(epIdx+i)%OVERPASS_EPS.length; // היצמד לשרת שעבד
+          return j;
+        }catch(e){ if(e.name==='AbortError') throw e; }
+      }
+      return null;
+    }
     async function loadPois(force){
       if(!poiOn) return;
       const z=map.getZoom();
@@ -608,16 +623,17 @@
       const c=map.getCenter();
       // דילוג אם התצוגה כמעט לא השתנתה — מונע שאילתות/רינדור מיותרים בזמן גלישה (נגד קיפאון)
       if(!force && lastPoiCenter && Math.round(z)===lastPoiZoom && haversine([c.lng,c.lat],lastPoiCenter)<300) return;
-      lastPoiCenter=[c.lng,c.lat]; lastPoiZoom=Math.round(z);
       const b=map.getBounds(), bbox=`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
-      const body='[out:json][timeout:25];('+POI_DEFS.map(d=>{const[k,v]=d.k.split('=');return `nwr["${k}"="${v}"](${bbox});`;}).join('')+');out center 80;';
+      const body='[out:json][timeout:20];('+POI_DEFS.map(d=>{const[k,v]=d.k.split('=');return `nwr["${k}"="${v}"](${bbox});`;}).join('')+');out center 80;';
       setPoiStatus('טוען נקודות עניין…');
       try{
         if(poiAbort) poiAbort.abort();
         poiAbort=new AbortController();
-        const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body,signal:poiAbort.signal});
-        renderPois((await r.json()).elements||[]);
-      }catch(e){ if(e.name!=='AbortError') setPoiStatus('שגיאה בטעינת נקודות עניין (Overpass)'); }
+        const j=await overpass(body, poiAbort.signal);
+        if(!j){ setPoiStatus('שרת נקודות העניין עמוס כרגע — לחצו 🏞️ לניסיון חוזר'); return; }
+        lastPoiCenter=[c.lng,c.lat]; lastPoiZoom=Math.round(z);   // מטמון רק בהצלחה
+        renderPois(j.elements||[]);
+      }catch(e){ if(e.name!=='AbortError') setPoiStatus('שגיאה זמנית — לחצו 🏞️ לניסיון חוזר'); }
     }
     function renderPois(elems){
       poiMarkers.forEach(m=>m.remove()); poiMarkers=[]; let n=0;
