@@ -375,7 +375,7 @@
     let hillshadeOn=false, contoursOn=false, terrainOn=false;
     function applyReliefState(){
       try{ if(map.getLayer('hillshade')) map.setLayoutProperty('hillshade','visibility', hillshadeOn?'visible':'none'); }catch(e){}
-      ['contour-casing','contour-lines'].forEach(id=>{ try{ if(map.getLayer(id)) map.setLayoutProperty(id,'visibility', contoursOn?'visible':'none'); }catch(e){} });
+      ['contour-casing','contour-lines','contour-labels'].forEach(id=>{ try{ if(map.getLayer(id)) map.setLayoutProperty(id,'visibility', contoursOn?'visible':'none'); }catch(e){} });
       try{ map.setTerrain(terrainOn && map.getSource('dem') ? {source:'dem', exaggeration:1.4} : null); }catch(e){}
     }
 
@@ -451,11 +451,19 @@
             paint: { "line-color": "rgba(30,25,18,0.4)", "line-width": ["match", ["get", "level"], 1, 3, 1.8] } },
           { id: "contour-lines", type: "line", source: "contours", "source-layer": "contours",
             layout: { visibility: "none", "line-join": "round" },
-            paint: { "line-color": "rgba(255,255,255,0.95)", "line-width": ["match", ["get", "level"], 1, 1.4, 0.7] } }
+            paint: { "line-color": "rgba(255,255,255,0.95)", "line-width": ["match", ["get", "level"], 1, 1.4, 0.7] } },
+          // מספרי גובה (מ' מעל פני הים) על קווי הגובה הראשיים
+          { id: "contour-labels", type: "symbol", source: "contours", "source-layer": "contours",
+            filter: [">", ["get", "level"], 0],
+            layout: { visibility: "none", "symbol-placement": "line", "text-max-angle": 25, "symbol-spacing": 280,
+              "text-field": ["concat", ["number-format", ["get", "ele"], { "max-fraction-digits": 0 }], " m"],
+              "text-font": ["Noto Sans Regular"], "text-size": 11, "text-padding": 6, "text-rotation-alignment": "map" },
+            paint: { "text-color": "#ffffff", "text-halo-color": "rgba(30,25,18,0.9)", "text-halo-width": 1.6 } }
         );
       }
       return {
         version: 8,
+        glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
         sources,
         layers: [
           { id: "base", type: "raster", source: "base" },
@@ -886,6 +894,7 @@
     function recStats(){ chipSet('trackInfo', `🎬 מקליט · ${fmtDist(recDist)} · ${fmtDur(Math.floor((Date.now()-recStart)/1000))} · ${recPts.length} נק׳`, true); recLabel(); }
     function recSaveBtns(show){ ['trackGpxBtn','trackSaveBtn','trackClearBtn'].forEach(id=>document.getElementById(id).style.display=show?'':'none'); }
     function startRec(){
+      if(!window.__loggedIn){ alert('כדי להקליט מסלול יש להתחבר תחילה 👤'); try{ document.getElementById('accountBtn').click(); }catch(_){}; return; }
       if(!navigator.geolocation) return alert('אין תמיכה ב-GPS בדפדפן');
       recording=true; recPts=[]; recDist=0; recLast=null; recStart=Date.now();
       recBtn.classList.add('on'); recSaveBtns(false); recStats();
@@ -1126,6 +1135,7 @@
 
     async function refresh() {
       const { data: { session } } = await supabase.auth.getSession();
+      window.__loggedIn = !!session;   // נחשף לסקריפט הראשי (גיבוי הקלטת מסלול)
       if (session) {
         authView.style.display = 'none'; profView.style.display = 'block';
         $('profileEmail').textContent = session.user.email;
