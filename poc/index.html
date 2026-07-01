@@ -1563,10 +1563,10 @@
       // תמונות שמורות -> סמנים
       try{
         const { data:ph } = await supabase.from('photos').select('storage_path,lat,lng,taken_at').limit(100);
-        (ph||[]).forEach(p=>{ if(p.lat==null||p.lng==null) return;
-          let url=''; try{ url=supabase.storage.from('photos').getPublicUrl(p.storage_path).data.publicUrl; }catch(_){}
-          if(url) addPhotoMarker([p.lng,p.lat], url, p.taken_at, 'שמור');
-        });
+        for(const p of (ph||[])){ if(p.lat==null||p.lng==null) continue;
+          const { data:signed } = await supabase.storage.from('photos').createSignedUrl(p.storage_path, 3600);
+          if(signed && signed.signedUrl) addPhotoMarker([p.lng,p.lat], signed.signedUrl, p.taken_at, 'שמור');
+        }
       }catch(e){ console.warn('load photos', e); }
     }
 
