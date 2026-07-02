@@ -230,11 +230,11 @@
   function persist(){ try{ const c=map.getCenter(); localStorage.setItem('fna_state', JSON.stringify({lat:c.lat,lng:c.lng,zoom:map.getZoom(),theme:document.body.dataset.theme,profile:routeProfile,lang:curLang})); }catch(e){} }
 
   const I18N={
-    he:{brand:'טיול של מארק',tagline:'· ניווט שטח',tt_search:'חיפוש מקום',tt_account:'חשבון / הרשמה',tt_trips:'טיולים קבוצתיים',tt_poi:'נקודות עניין',tt_photo:'צלם / צרף תמונה',tt_import:'ייבוא מסלול',tt_print:'הדפסה',tt_theme:'יום / לילה',tt_lang:'שפה',tt_bearing:'קרן אווירית ליעד',tt_route:'מסלול שטח ליעד',tt_distance:'מדידת מרחק',tt_area:'מדידת שטח',tt_point:'נקודה + קואורדינטות',fab_showme:'הצג אותי',fab_record:'הקלט מסלול',hint_main:'👆 הקישו על המפה ליעד ← מסלול שטח · 🔎 חיפוש · 🏞️ נקודות עניין',search_ph:'חיפוש מקום…',hdr_poi:'סינון נקודות עניין',hdr_profile:'פרופיל מסלול',hdr_layers:'שכבת רקע',grp_water:'מים ומעיינות',grp_nature:'טבע ותצפית',grp_heritage:'מורשת ועתיקות',grp_tour:'תיור בשטח',prof_car:'רכב שטח (4x4)',prof_hike:'הליכה / טרקים',prof_mtb:'אופני שטח',lyr_hiking:'שבילים (ישראל)',lyr_topo:'טופוגרפי + קווי גובה',lyr_satellite:'צילום אוויר',lyr_street:'מפת רחוב',acc_login:'התחברות',acc_signup:'הרשמה',acc_logout:'התנתקות',acc_save:'שמירה'},
-    en:{brand:"Mark's Trip",tagline:'· Field Navigation',tt_search:'Search a place',tt_account:'Account',tt_trips:'Group trips',tt_poi:'Points of interest',tt_photo:'Photo',tt_import:'Import route',tt_print:'Print',tt_theme:'Day / Night',tt_lang:'Language',tt_bearing:'Bearing line to target',tt_route:'Off-road route',tt_distance:'Measure distance',tt_area:'Measure area',tt_point:'Point + coordinates',fab_showme:'Show me',fab_record:'Record track',hint_main:'👆 Tap the map for a destination → route · 🔎 Search · 🏞️ POIs',search_ph:'Search place…',hdr_poi:'Filter points of interest',hdr_profile:'Route profile',hdr_layers:'Base layer',grp_water:'Water & springs',grp_nature:'Nature & viewpoints',grp_heritage:'Heritage & antiquities',grp_tour:'Field touring',prof_car:'Off-road (4x4)',prof_hike:'Hiking',prof_mtb:'Mountain bike',lyr_hiking:'Trails (Israel)',lyr_topo:'Topographic + contours',lyr_satellite:'Aerial',lyr_street:'Street map',acc_login:'Log in',acc_signup:'Sign up',acc_logout:'Log out',acc_save:'Save'},
-    fr:{brand:'Le voyage de Mark',tagline:'· Navigation tout-terrain',tt_search:'Rechercher',tt_account:'Compte',tt_trips:'Sorties de groupe',tt_poi:"Points d'intérêt",tt_photo:'Photo',tt_import:'Importer',tt_print:'Imprimer',tt_theme:'Jour / Nuit',tt_lang:'Langue',tt_bearing:'Ligne directe',tt_route:'Itinéraire tout-terrain',tt_distance:'Mesurer distance',tt_area:'Mesurer surface',tt_point:'Point + coordonnées',fab_showme:'Me localiser',fab_record:'Enregistrer',hint_main:'👆 Touchez la carte → itinéraire · 🔎 Recherche · 🏞️ POI',search_ph:'Rechercher…',hdr_poi:"Filtrer les POI",hdr_profile:'Profil de route',hdr_layers:'Fond de carte',grp_water:'Eau & sources',grp_nature:'Nature & vues',grp_heritage:'Patrimoine',grp_tour:'Randonnée',prof_car:'Tout-terrain (4x4)',prof_hike:'Randonnée',prof_mtb:'VTT',lyr_hiking:'Sentiers (Israël)',lyr_topo:'Topographique + courbes',lyr_satellite:'Aérienne',lyr_street:'Plan',acc_login:'Se connecter',acc_signup:"S'inscrire",acc_logout:'Déconnexion',acc_save:'Enregistrer'},
-    es:{brand:'El viaje de Mark',tagline:'· Navegación de campo',tt_search:'Buscar',tt_account:'Cuenta',tt_trips:'Viajes en grupo',tt_poi:'Puntos de interés',tt_photo:'Foto',tt_import:'Importar',tt_print:'Imprimir',tt_theme:'Día / Noche',tt_lang:'Idioma',tt_bearing:'Línea directa',tt_route:'Ruta todoterreno',tt_distance:'Medir distancia',tt_area:'Medir área',tt_point:'Punto + coordenadas',fab_showme:'Ubícame',fab_record:'Grabar',hint_main:'👆 Toca el mapa → ruta · 🔎 Buscar · 🏞️ POI',search_ph:'Buscar…',hdr_poi:'Filtrar POI',hdr_profile:'Perfil de ruta',hdr_layers:'Mapa base',grp_water:'Agua y manantiales',grp_nature:'Naturaleza y miradores',grp_heritage:'Patrimonio',grp_tour:'Excursión',prof_car:'Todoterreno (4x4)',prof_hike:'Senderismo',prof_mtb:'Bici de montaña',lyr_hiking:'Senderos (Israel)',lyr_topo:'Topográfico + curvas',lyr_satellite:'Aérea',lyr_street:'Callejero',acc_login:'Entrar',acc_signup:'Registrarse',acc_logout:'Salir',acc_save:'Guardar'},
-    ru:{brand:'Поездка Марка',tagline:'· Навигация',tt_search:'Поиск места',tt_account:'Аккаунт',tt_trips:'Группы',tt_poi:'Точки интереса',tt_photo:'Фото',tt_import:'Импорт',tt_print:'Печать',tt_theme:'День / Ночь',tt_lang:'Язык',tt_bearing:'Прямая линия',tt_route:'Внедорожный маршрут',tt_distance:'Расстояние',tt_area:'Площадь',tt_point:'Точка + координаты',fab_showme:'Показать меня',fab_record:'Запись трека',hint_main:'👆 Коснитесь карты → маршрут · 🔎 Поиск · 🏞️ POI',search_ph:'Поиск места…',hdr_poi:'Фильтр точек',hdr_profile:'Профиль маршрута',hdr_layers:'Подложка',grp_water:'Вода и источники',grp_nature:'Природа и виды',grp_heritage:'Наследие',grp_tour:'Походы',prof_car:'Внедорожник (4x4)',prof_hike:'Пеший',prof_mtb:'Велосипед',lyr_hiking:'Тропы (Израиль)',lyr_topo:'Топография + горизонтали',lyr_satellite:'Аэрофото',lyr_street:'Улицы',acc_login:'Войти',acc_signup:'Регистрация',acc_logout:'Выйти',acc_save:'Сохранить'}
+    he:{brand:'טיול של מארק',tagline:'· ניווט שטח',tt_search:'חיפוש מקום',tt_account:'חשבון / הרשמה',tt_trips:'טיולים קבוצתיים',tt_poi:'נקודות עניין',tt_photo:'צלם / צרף תמונה',tt_import:'ייבוא מסלול',tt_print:'הדפסה',tt_theme:'יום / לילה',tt_lang:'שפה',tt_bearing:'קרן אווירית ליעד',tt_route:'מסלול שטח ליעד',tt_distance:'מדידת מרחק',tt_area:'מדידת שטח',tt_point:'נקודה + קואורדינטות',fab_showme:'הצג אותי',fab_record:'הקלט מסלול',hint_main:'👆 הקישו על המפה ליעד ← מסלול שטח · 🔎 חיפוש · 🏞️ נקודות עניין',search_ph:'חיפוש מקום…',hdr_poi:'סינון נקודות עניין',hdr_profile:'פרופיל מסלול',hdr_layers:'שכבת רקע',grp_water:'מים ומעיינות',grp_nature:'טבע ותצפית',grp_heritage:'מורשת ועתיקות',grp_tour:'תיור בשטח',prof_car:'רכב שטח (4x4)',prof_hike:'הליכה / טרקים',prof_mtb:'אופני שטח',lyr_hiking:'שבילים (ישראל)',lyr_topo:'טופוגרפי + קווי גובה',lyr_satellite:'צילום אוויר',lyr_street:'מפת רחוב',acc_login:'התחברות',acc_signup:'הרשמה',acc_logout:'התנתקות',acc_save:'שמירה',ov_contours:'קווי גובה'},
+    en:{brand:"Mark's Trip",tagline:'· Field Navigation',tt_search:'Search a place',tt_account:'Account',tt_trips:'Group trips',tt_poi:'Points of interest',tt_photo:'Photo',tt_import:'Import route',tt_print:'Print',tt_theme:'Day / Night',tt_lang:'Language',tt_bearing:'Bearing line to target',tt_route:'Off-road route',tt_distance:'Measure distance',tt_area:'Measure area',tt_point:'Point + coordinates',fab_showme:'Show me',fab_record:'Record track',hint_main:'👆 Tap the map for a destination → route · 🔎 Search · 🏞️ POIs',search_ph:'Search place…',hdr_poi:'Filter points of interest',hdr_profile:'Route profile',hdr_layers:'Base layer',grp_water:'Water & springs',grp_nature:'Nature & viewpoints',grp_heritage:'Heritage & antiquities',grp_tour:'Field touring',prof_car:'Off-road (4x4)',prof_hike:'Hiking',prof_mtb:'Mountain bike',lyr_hiking:'Trails (Israel)',lyr_topo:'Topographic + contours',lyr_satellite:'Aerial',lyr_street:'Street map',acc_login:'Log in',acc_signup:'Sign up',acc_logout:'Log out',acc_save:'Save',ov_contours:'Contour lines'},
+    fr:{brand:'Le voyage de Mark',tagline:'· Navigation tout-terrain',tt_search:'Rechercher',tt_account:'Compte',tt_trips:'Sorties de groupe',tt_poi:"Points d'intérêt",tt_photo:'Photo',tt_import:'Importer',tt_print:'Imprimer',tt_theme:'Jour / Nuit',tt_lang:'Langue',tt_bearing:'Ligne directe',tt_route:'Itinéraire tout-terrain',tt_distance:'Mesurer distance',tt_area:'Mesurer surface',tt_point:'Point + coordonnées',fab_showme:'Me localiser',fab_record:'Enregistrer',hint_main:'👆 Touchez la carte → itinéraire · 🔎 Recherche · 🏞️ POI',search_ph:'Rechercher…',hdr_poi:"Filtrer les POI",hdr_profile:'Profil de route',hdr_layers:'Fond de carte',grp_water:'Eau & sources',grp_nature:'Nature & vues',grp_heritage:'Patrimoine',grp_tour:'Randonnée',prof_car:'Tout-terrain (4x4)',prof_hike:'Randonnée',prof_mtb:'VTT',lyr_hiking:'Sentiers (Israël)',lyr_topo:'Topographique + courbes',lyr_satellite:'Aérienne',lyr_street:'Plan',acc_login:'Se connecter',acc_signup:"S'inscrire",acc_logout:'Déconnexion',acc_save:'Enregistrer',ov_contours:'Courbes de niveau'},
+    es:{brand:'El viaje de Mark',tagline:'· Navegación de campo',tt_search:'Buscar',tt_account:'Cuenta',tt_trips:'Viajes en grupo',tt_poi:'Puntos de interés',tt_photo:'Foto',tt_import:'Importar',tt_print:'Imprimir',tt_theme:'Día / Noche',tt_lang:'Idioma',tt_bearing:'Línea directa',tt_route:'Ruta todoterreno',tt_distance:'Medir distancia',tt_area:'Medir área',tt_point:'Punto + coordenadas',fab_showme:'Ubícame',fab_record:'Grabar',hint_main:'👆 Toca el mapa → ruta · 🔎 Buscar · 🏞️ POI',search_ph:'Buscar…',hdr_poi:'Filtrar POI',hdr_profile:'Perfil de ruta',hdr_layers:'Mapa base',grp_water:'Agua y manantiales',grp_nature:'Naturaleza y miradores',grp_heritage:'Patrimonio',grp_tour:'Excursión',prof_car:'Todoterreno (4x4)',prof_hike:'Senderismo',prof_mtb:'Bici de montaña',lyr_hiking:'Senderos (Israel)',lyr_topo:'Topográfico + curvas',lyr_satellite:'Aérea',lyr_street:'Callejero',acc_login:'Entrar',acc_signup:'Registrarse',acc_logout:'Salir',acc_save:'Guardar',ov_contours:'Curvas de nivel'},
+    ru:{brand:'Поездка Марка',tagline:'· Навигация',tt_search:'Поиск места',tt_account:'Аккаунт',tt_trips:'Группы',tt_poi:'Точки интереса',tt_photo:'Фото',tt_import:'Импорт',tt_print:'Печать',tt_theme:'День / Ночь',tt_lang:'Язык',tt_bearing:'Прямая линия',tt_route:'Внедорожный маршрут',tt_distance:'Расстояние',tt_area:'Площадь',tt_point:'Точка + координаты',fab_showme:'Показать меня',fab_record:'Запись трека',hint_main:'👆 Коснитесь карты → маршрут · 🔎 Поиск · 🏞️ POI',search_ph:'Поиск места…',hdr_poi:'Фильтр точек',hdr_profile:'Профиль маршрута',hdr_layers:'Подложка',grp_water:'Вода и источники',grp_nature:'Природа и виды',grp_heritage:'Наследие',grp_tour:'Походы',prof_car:'Внедорожник (4x4)',prof_hike:'Пеший',prof_mtb:'Велосипед',lyr_hiking:'Тропы (Израиль)',lyr_topo:'Топография + горизонтали',lyr_satellite:'Аэрофото',lyr_street:'Улицы',acc_login:'Войти',acc_signup:'Регистрация',acc_logout:'Выйти',acc_save:'Сохранить',ov_contours:'Горизонтали'}
   };
   function T(k){ return (I18N[curLang]&&I18N[curLang][k])||I18N.he[k]||k; }
   function applyI18n(){
@@ -279,7 +279,7 @@
     document.querySelectorAll('[data-k]').forEach(c=>c.classList.toggle('active', c.dataset.k===key));
     persist();
   }
-  map.on('moveend', ()=>{ persist(); schedulePois(); });
+  map.on('moveend', ()=>{ persist(); schedulePois(); if(typeof scheduleContours==='function')scheduleContours(); });
 
   // עזרי גאומטריה
   const toRad=d=>d*Math.PI/180;
@@ -289,6 +289,7 @@
   function geoArea(c){ const R=6378137; let a=0,n=c.length; if(n<3)return 0; for(let i=0;i<n;i++){ const p1=c[i],p2=c[(i+1)%n]; a+=toRad(p2[0]-p1[0])*(2+Math.sin(toRad(p1[1]))+Math.sin(toRad(p2[1]))); } return Math.abs(a*R*R/2); }
   function fmtDist(m){ return m>=1000?(m/1000).toFixed(2)+' ק"מ':Math.round(m)+' מ׳'; }
   function fmtArea(m2){ if(m2<10000)return Math.round(m2)+' מ"ר ('+(m2/1000).toFixed(2)+' דונם)'; if(m2<1e6)return (m2/1000).toFixed(1)+' דונם'; return (m2/1e6).toFixed(2)+' קמ"ר'; }
+  function scaleDenom(){ const s=map.getSize(); const b=map.getBounds(); const h=map.distance(b.getNorthWest(),b.getSouthWest()); return (h/s.y)*96/0.0254; } // 1:denom @96dpi
   function chip(id,t,show){ const e=document.getElementById(id); if(!e)return; e.style.display=show?'flex':'none'; e.querySelector('span').textContent=t; }
   function setPoiStatus(t){ const e=document.getElementById('poiStatus'); e.textContent=t; e.style.display=t?'block':'none'; }
 
@@ -336,10 +337,12 @@
   poiLayer.addTo(map);
   function schedulePois(){ if(!poiOn)return; clearTimeout(poiTimer); poiTimer=setTimeout(loadPois,1000); }
   async function loadPois(force){
-    if(!poiOn)return; if(map.getZoom()<12){ setPoiStatus('התקרבו (זום) כדי לראות נקודות עניין'); return; }
+    if(!poiOn)return;
+    if(scaleDenom()>500000){ setPoiStatus('התקרבו (זום) כדי לראות נקודות עניין'); return; }
     const defs=POI_DEFS.filter(d=>activeGroups.has(d.grp));
     if(!defs.length){ poiLayer.clearLayers(); setPoiStatus('בחרו קטגוריות'); return; }
-    const b=map.getBounds(), key=b.getSouth().toFixed(2)+b.getWest().toFixed(2)+Math.round(map.getZoom());
+    const b=map.getBounds().pad(0.2);   // המרובע הנצפה + באפר 20%
+    const key=b.getSouth().toFixed(3)+b.getWest().toFixed(3)+Math.round(map.getZoom());
     if(!force && key===lastPoiKey) return;
     const bbox=b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast();
     const q='[out:json][timeout:20];('+defs.map(d=>{const[k,v]=d.k.split('=');return 'nwr["'+k+'"="'+v+'"]('+bbox+');';}).join('')+');out center 80;';
@@ -371,6 +374,44 @@
     setPoiStatus('נמצאו '+n+' נקודות עניין');
   }
   document.getElementById('poiBtn').onclick=e=>{ poiOn=!poiOn; e.currentTarget.classList.toggle('active',poiOn); if(poiOn)loadPois(true); else { poiLayer.clearLayers(); setPoiStatus(''); } };
+
+  // ================== קווי גובה (overlay מחושב מ-DEM, צהוב-לבן + מספרים) ==================
+  let contoursOn=false, contourLayer=L.layerGroup().addTo(map), contourBusy=false, d3c=null, contourTimer=null;
+  function scheduleContours(){ if(!contoursOn)return; clearTimeout(contourTimer); contourTimer=setTimeout(loadContours,700); }
+  function demTile(x,y,z){ return new Promise((res,rej)=>{ const im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>res({im,x,y}); im.onerror=()=>rej(new Error('t')); im.src='https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+x+'/'+y+'.png'; }); }
+  async function loadContours(){
+    if(!contoursOn)return;
+    if(scaleDenom()>600000){ contourLayer.clearLayers(); setPoiStatus('התקרבו כדי לראות קווי גובה'); return; }
+    if(contourBusy)return; contourBusy=true;
+    try{
+      if(!d3c){ d3c=(await import('https://esm.sh/d3-contour@4')).contours; }
+      const z=Math.min(Math.max(Math.round(map.getZoom())-1,10),12);
+      const b=map.getBounds().pad(0.1);
+      const nw=map.project(b.getNorthWest(),z), se=map.project(b.getSouthEast(),z);
+      const tx0=Math.floor(nw.x/256),tx1=Math.floor(se.x/256),ty0=Math.floor(nw.y/256),ty1=Math.floor(se.y/256);
+      if((tx1-tx0+1)*(ty1-ty0+1)>20){ contourBusy=false; return; }
+      const W=(tx1-tx0+1)*256,H=(ty1-ty0+1)*256;
+      const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d',{willReadFrequently:true});
+      const loaded=await Promise.all((function(){const a=[];for(let x=tx0;x<=tx1;x++)for(let y=ty0;y<=ty1;y++)a.push(demTile(x,y,z).catch(()=>null));return a;})());
+      loaded.forEach(t=>{ if(t)ctx.drawImage(t.im,(t.x-tx0)*256,(t.y-ty0)*256); });
+      const data=ctx.getImageData(0,0,W,H).data, grid=new Float32Array(W*H); let mn=Infinity,mx=-Infinity;
+      for(let i=0;i<W*H;i++){ const v=(data[i*4]*256+data[i*4+1]+data[i*4+2]/256)-32768; grid[i]=v; if(v>-400&&v<9000){if(v<mn)mn=v;if(v>mx)mx=v;} }
+      if(!isFinite(mn)){ contourBusy=false; return; }
+      const interval=z>=12?25:50, major=interval*4, thrs=[];
+      for(let e=Math.ceil(mn/interval)*interval;e<=mx;e+=interval){ thrs.push(e); if(thrs.length>80)break; }
+      const polys=d3c().size([W,H]).thresholds(thrs)(grid);
+      contourLayer.clearLayers();
+      polys.forEach(c=>{ const isMaj=Math.round(c.value)%major===0;
+        c.coordinates.forEach(poly=>poly.forEach(ring=>{
+          const lls=ring.map(pt=>map.unproject(L.point(tx0*256+pt[0],ty0*256+pt[1]),z));
+          contourLayer.addLayer(L.polyline(lls,{color:'#fff6a8',weight:isMaj?1.8:0.9,opacity:0.92}));
+          if(isMaj && lls.length>24){ const mid=lls[Math.floor(lls.length/2)]; contourLayer.addLayer(L.marker(mid,{interactive:false,icon:L.divIcon({html:'<span style="color:#fff;background:rgba(50,40,20,.72);padding:0 4px;border-radius:4px;font:800 10px sans-serif">'+Math.round(c.value)+'</span>',className:'',iconSize:[0,0]})})); }
+        }));
+      });
+      setPoiStatus('');
+    }catch(e){ console.warn('contours',e); setPoiStatus('קווי גובה: שגיאה בטעינה'); }
+    contourBusy=false;
+  }
 
   // ================== הצג אותי (GPS) ==================
   let geoWatch=null, meMarker=null, meCircle=null, firstFix=true;
@@ -448,7 +489,26 @@
   document.getElementById('searchClose').onclick=()=>{ searchBar.classList.remove('open'); searchResults.innerHTML=''; searchInput.value=''; };
   let searchTimer=null, searchMarker=null;
   searchInput.oninput=()=>{ clearTimeout(searchTimer); const q=searchInput.value.trim(); if(q.length<2){searchResults.innerHTML='';return;} searchTimer=setTimeout(()=>doSearch(q),500); };
-  async function doSearch(q){ searchResults.innerHTML='<div class="res">מחפש…</div>'; try{ const arr=await (await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=il&limit=6&accept-language='+curLang+'&q='+encodeURIComponent(q))).json(); if(!arr.length){searchResults.innerHTML='<div class="res">לא נמצאו תוצאות</div>';return;} searchResults.innerHTML=''; arr.forEach(it=>{ const b=document.createElement('button'); b.className='res'; b.innerHTML=(it.name||it.display_name.split(',')[0])+'<small>'+it.display_name+'</small>'; b.onclick=()=>goToResult(+it.lon,+it.lat,it.name||it.display_name.split(',')[0]); searchResults.appendChild(b); }); }catch(e){ searchResults.innerHTML='<div class="res">שגיאת חיפוש</div>'; } }
+  const NATURE_CLASS=['natural','waterway','water','tourism','leisure','historic','geological','place'];
+  const TYPE_ICON={spring:'💧',water:'💧',stream:'💧',river:'💧',waterfall:'🌊',peak:'⛰️',cave_entrance:'🕳️',viewpoint:'🔭',attraction:'⭐',archaeological_site:'🏛️',ruins:'🏚️',nature_reserve:'🌳',wood:'🌳',beach:'🏖️',camp_site:'⛺',monastery:'⛪'};
+  async function doSearch(q){
+    searchResults.innerHTML='<div class="res">מחפש…</div>';
+    try{
+      const arr=await (await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=il&limit=25&dedupe=1&accept-language='+curLang+'&q='+encodeURIComponent(q))).json();
+      if(!arr.length){ searchResults.innerHTML='<div class="res">לא נמצאו תוצאות</div>'; return; }
+      // עדיפות למקומות טבע/תיול/מים/מורשת על פני כתובות
+      arr.sort((a,b)=>(NATURE_CLASS.includes(b.class)?1:0)-(NATURE_CLASS.includes(a.class)?1:0));
+      searchResults.innerHTML='';
+      arr.slice(0,8).forEach(it=>{
+        const nm=it.name||it.display_name.split(',')[0];
+        const ic=TYPE_ICON[it.type]|| (NATURE_CLASS.includes(it.class)?'📍':'🏠');
+        const b=document.createElement('button'); b.className='res';
+        b.innerHTML=ic+' '+nm+'<small>'+(it.type?it.type+' · ':'')+it.display_name+'</small>';
+        b.onclick=()=>goToResult(+it.lon,+it.lat,nm);
+        searchResults.appendChild(b);
+      });
+    }catch(e){ searchResults.innerHTML='<div class="res">שגיאת חיפוש</div>'; }
+  }
   function goToResult(lng,lat,name){ searchBar.classList.remove('open'); searchResults.innerHTML=''; map.setView([lat,lng],15); if(searchMarker)map.removeLayer(searchMarker); const html='<div class="poi-pop"><b>'+name+'</b><br><button class="poi-route-btn" data-lng="'+lng+'" data-lat="'+lat+'">🧭 נווט לכאן</button></div>'; searchMarker=L.marker([lat,lng],{icon:emojiIcon('📍',28)}).addTo(map).bindPopup(html).openPopup(); searchMarker.on('popupopen',ev=>{ const btn=ev.popup.getElement().querySelector('.poi-route-btn'); if(btn)btn.onclick=()=>{setDestination([+btn.dataset.lng,+btn.dataset.lat]);searchMarker.closePopup();}; }); }
 
   // ================== R7 הדפסה ==================
@@ -467,6 +527,7 @@
   function addDiv(){ const d=document.createElement('div'); d.className='ldiv'; layersEl.appendChild(d); }
   addHdr('hdr_layers');
   [['hiking','🥾'],['topo','🗻'],['satellite','🛰️'],['street','🗺️']].forEach(([k,ic])=>{ const b=document.createElement('button'); b.className='layer-chip'+(k===current?' active':''); b.dataset.k=k; b.innerHTML='<span class="dot">'+ic+'</span><span data-i18n="lyr_'+k+'">'+T('lyr_'+k)+'</span>'; b.onclick=()=>setLayer(k); layersEl.appendChild(b); });
+  { const b=document.createElement('button'); b.className='layer-chip'; b.id='contourChip'; b.innerHTML='<span class="dot">📈</span><span data-i18n="ov_contours">'+T('ov_contours')+'</span>'; b.onclick=()=>{ contoursOn=!contoursOn; b.classList.toggle('active',contoursOn); if(contoursOn){ setPoiStatus('מחשב קווי גובה…'); loadContours(); } else contourLayer.clearLayers(); }; layersEl.appendChild(b); }
   addDiv(); addHdr('hdr_poi');
   [['water','💧'],['nature','🌄'],['heritage','🏛️'],['tour','⛺']].forEach(([g,ic])=>{ const b=document.createElement('button'); b.className='layer-chip active'; b.dataset.grp=g; b.innerHTML='<span class="dot">'+ic+'</span><span data-i18n="grp_'+g+'">'+T('grp_'+g)+'</span>'; b.onclick=()=>{ activeGroups.has(g)?activeGroups.delete(g):activeGroups.add(g); b.classList.toggle('active',activeGroups.has(g)); if(poiOn)loadPois(true); }; layersEl.appendChild(b); });
   addDiv(); addHdr('hdr_profile');
