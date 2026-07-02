@@ -350,13 +350,16 @@
     const b=map.getBounds().pad(0.2);   // המרובע הנצפה + באפר 20%
     const key=b.getSouth().toFixed(3)+b.getWest().toFixed(3)+Math.round(map.getZoom());
     if(!force && key===lastPoiKey) return;
-    const bbox=b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast();
-    const q='[out:json][timeout:20];('+defs.map(d=>{const[k,v]=d.k.split('=');return 'nwr["'+k+'"="'+v+'"]('+bbox+');';}).join('')+');out center 80;';
+    const bbox=b.getSouth().toFixed(4)+','+b.getWest().toFixed(4)+','+b.getNorth().toFixed(4)+','+b.getEast().toFixed(4);
+    // איחוד קטגוריות לפי מפתח OSM לשאילתת regex קצרה (URL קצר, מהיר, לא נדחה)
+    const byKey={}; defs.forEach(d=>{ const [k,v]=d.k.split('='); (byKey[k]=byKey[k]||[]).push(v); });
+    const clauses=Object.keys(byKey).map(k=>'nwr["'+k+'"~"^('+byKey[k].join('|')+')$"]('+bbox+');').join('');
+    const q='[out:json][timeout:25];('+clauses+');out center 60;';
     setPoiStatus('טוען נקודות עניין…');
     for(let i=0;i<OVERPASS.length;i++){
       try{
-        const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),15000);
-        const r=await fetch(OVERPASS[i]+'?data='+encodeURIComponent(q),{signal:ac.signal}); clearTimeout(to);  // GET (POST נחסם ברשתות מסוימות)
+        const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),18000);
+        const r=await fetch(OVERPASS[i]+'?data='+encodeURIComponent(q),{signal:ac.signal}); clearTimeout(to);
         if(!r.ok) continue;
         const j=JSON.parse(await r.text()); lastPoiKey=key; renderPois(j.elements||[]); return;
       }catch(e){}
