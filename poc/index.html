@@ -313,7 +313,7 @@
   function setDestination(ll){ // ll=[lng,lat] — נתיב מנקודת ההתחלה/מיקום GPS ליעד
     destPoint=ll; if(destMarker) map.removeLayer(destMarker);
     destMarker=L.marker([ll[1],ll[0]],{icon:emojiIcon('🚩',26)}).addTo(map);
-    routeTo(startPoint||[map.getCenter().lng,map.getCenter().lat], ll);
+    routeTo(window.__myPos||startPoint||[map.getCenter().lng,map.getCenter().lat], ll);
   }
   // הקשה על המפה: אם יש מיקום/התחלה → זו נקודת היעד; אחרת ההקשה הראשונה = התחלה
   function routeTap(ll){
@@ -410,8 +410,8 @@
       polys.forEach(c=>{ const isMaj=Math.round(c.value)%major===0;
         c.coordinates.forEach(poly=>poly.forEach(ring=>{
           const lls=ring.map(pt=>map.unproject(L.point(tx0*256+pt[0],ty0*256+pt[1]),z));
-          contourLayer.addLayer(L.polyline(lls,{color:'#fff6a8',weight:isMaj?1.8:0.9,opacity:0.92}));
-          if(isMaj && lls.length>24){ const mid=lls[Math.floor(lls.length/2)]; contourLayer.addLayer(L.marker(mid,{interactive:false,icon:L.divIcon({html:'<span style="color:#fff;background:rgba(50,40,20,.72);padding:0 4px;border-radius:4px;font:800 10px sans-serif">'+Math.round(c.value)+'</span>',className:'',iconSize:[0,0]})})); }
+          contourLayer.addLayer(L.polyline(lls,{color:'#fff6a8',weight:isMaj?2:1,opacity:0.95}));
+          if(lls.length>14){ const mid=lls[Math.floor(lls.length/2)]; contourLayer.addLayer(L.marker(mid,{interactive:false,icon:L.divIcon({html:'<span style="color:#fff6a8;background:rgba(40,30,10,.8);padding:0 4px;border-radius:4px;font:800 '+(isMaj?11:10)+'px sans-serif">'+Math.round(c.value)+'</span>',className:'',iconSize:[0,0]})})); }
         }));
       });
       setPoiStatus('');
@@ -459,7 +459,7 @@
   let activeTool=null;
   function setActiveTool(t){ if(activeTool===t)t=null; activeTool=t; document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t)); if(t==='distance'||t==='area'){clearMeasure();measureMode=t;} }
   document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.onclick=()=>setActiveTool(b.dataset.tool));
-  map.on('click', e=>{ const ll=[e.latlng.lng,e.latlng.lat]; switch(activeTool){ case 'bearing':setNavTarget(ll);break; case 'distance':case 'area':addMeasure(ll);break; case 'point':dropPoint(ll);break; default:routeTap(ll); } });
+  map.on('click', e=>{ const ll=[e.latlng.lng,e.latlng.lat]; switch(activeTool){ case 'bearing':setNavTarget(ll);break; case 'distance':case 'area':addMeasure(ll);break; case 'point':dropPoint(ll);break; default:setDestination(ll); } });
 
   // ================== R4 הקלטת מסלול ==================
   let recording=false, recWatch=null, recPts=[], recLine=null, recDist=0, recLast=null, recStart=0, recTimer=null, recDur=0;
