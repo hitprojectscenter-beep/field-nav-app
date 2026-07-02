@@ -91,6 +91,9 @@
     .me-dot{ width:20px; height:20px; position:relative; }
     .me-dot .c{ position:absolute; inset:5px; background:#1f6fd1; border:2px solid #fff; border-radius:50%; }
     .me-dot .p{ position:absolute; inset:0; border-radius:50%; background:rgba(31,111,209,.35); animation:mePulse 2s infinite; }
+    .me-nav{ width:42px; height:42px; position:relative; display:grid; place-items:center; }
+    .me-nav .me-halo{ position:absolute; inset:0; border-radius:50%; background:rgba(31,111,209,.28); animation:mePulse 2s infinite; }
+    .me-nav .me-arrow{ position:relative; z-index:2; filter:drop-shadow(0 1px 3px rgba(0,0,0,.55)); transition:transform .3s linear; transform-origin:50% 50%; }
     @keyframes mePulse{ 0%{transform:scale(.5);opacity:.85} 100%{transform:scale(2.3);opacity:0} }
     .emoji-icon{ font-size:22px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.45)); text-align:center; line-height:1; }
     .member-dot{ width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:grid;place-items:center;font-size:17px;color:#fff; }
@@ -451,11 +454,14 @@
   }
 
   // ================== הצג אותי (GPS) ==================
-  let geoWatch=null, meMarker=null, meCircle=null, firstFix=true;
+  let geoWatch=null, meMarker=null, meCircle=null, firstFix=true, meHeading=0;
+  function makeMeIcon(h){ return L.divIcon({ className:'', iconSize:[42,42], iconAnchor:[21,21],
+    html:'<div class="me-nav"><div class="me-halo"></div><div class="me-arrow" style="transform:rotate('+(h||0)+'deg)"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 2 L20.5 21 L12 16.2 L3.5 21 Z" fill="#1f6fd1" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/></svg></div></div>' }); }
   function startShowMe(){ if(!navigator.geolocation)return alert('אין GPS'); firstFix=true; const sb=document.getElementById('showMeBtn'); sb.classList.add('on'); sb.querySelector('.tx').textContent='מאתר…';
     geoWatch=navigator.geolocation.watchPosition(p=>{ const la=p.coords.latitude, lo=p.coords.longitude; startPoint=[lo,la]; window.__myPos=[lo,la];
-      if(!meMarker){ meMarker=L.marker([la,lo],{icon:L.divIcon({html:'<div class="me-dot"><div class="p"></div><div class="c"></div></div>',className:'',iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map); }
-      else meMarker.setLatLng([la,lo]);
+      const hd=p.coords.heading; if(hd!=null && !isNaN(hd)) meHeading=hd;
+      if(!meMarker){ meMarker=L.marker([la,lo],{icon:makeMeIcon(meHeading),interactive:false,zIndexOffset:1000}).addTo(map); }
+      else { meMarker.setLatLng([la,lo]); meMarker.setIcon(makeMeIcon(meHeading)); }
       sb.querySelector('.tx').textContent='מציג אותך ✓';
       if(firstFix){ map.setView([la,lo],Math.max(map.getZoom(),14)); firstFix=false; } updateBearing();
     }, e=>{ alert('שגיאת GPS: '+e.message); stopShowMe(); }, {enableHighAccuracy:true,maximumAge:3000,timeout:15000}); }
