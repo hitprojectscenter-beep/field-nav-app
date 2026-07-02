@@ -342,50 +342,37 @@
   let poiOn=false, poiLayer=L.layerGroup(), activeGroups=new Set(['water','nature','heritage','tour']), poiTimer=null, lastPoiKey='';
   poiLayer.addTo(map);
   function schedulePois(){ if(!poiOn)return; clearTimeout(poiTimer); poiTimer=setTimeout(loadPois,1000); }
+  const SB_URL='https://dxfxpsfhjfygxrkitnob.supabase.co', SB_KEY='sb_publishable_mrxqAF43tH7TSoHxnWIrVQ_fVScbqxV';
+  const POI_BYCAT={}; POI_DEFS.forEach(d=>{ POI_BYCAT[d.k.split('=')[1]]=d; });
+  // שליפת נקודות עניין מ-Supabase (טעונות מראש) לפי המרובע הנצפה — מיידי, ללא Overpass
   async function loadPois(force){
     if(!poiOn)return;
     if(scaleDenom()>500000){ setPoiStatus('התקרבו (זום) כדי לראות נקודות עניין'); return; }
-    const defs=POI_DEFS.filter(d=>activeGroups.has(d.grp));
-    if(!defs.length){ poiLayer.clearLayers(); setPoiStatus('בחרו קטגוריות'); return; }
+    const cats=POI_DEFS.filter(d=>activeGroups.has(d.grp)).map(d=>d.k.split('=')[1]);
+    if(!cats.length){ poiLayer.clearLayers(); setPoiStatus('בחרו קטגוריות'); return; }
     const b=map.getBounds().pad(0.2);   // המרובע הנצפה + באפר 20%
     const key=b.getSouth().toFixed(3)+b.getWest().toFixed(3)+Math.round(map.getZoom());
     if(!force && key===lastPoiKey) return;
-    const bbox=b.getSouth().toFixed(4)+','+b.getWest().toFixed(4)+','+b.getNorth().toFixed(4)+','+b.getEast().toFixed(4);
-    // איחוד קטגוריות לפי מפתח OSM לשאילתת regex קצרה (URL קצר, מהיר, לא נדחה)
-    const byKey={}; defs.forEach(d=>{ const [k,v]=d.k.split('='); (byKey[k]=byKey[k]||[]).push(v); });
-    const clauses=Object.keys(byKey).map(k=>'nwr["'+k+'"~"^('+byKey[k].join('|')+')$"]('+bbox+');').join('');
-    const q='[out:json][timeout:25];('+clauses+');out center 60;';
+    const s=b.getSouth().toFixed(5),w=b.getWest().toFixed(5),nn=b.getNorth().toFixed(5),ee=b.getEast().toFixed(5);
+    const url=SB_URL+'/rest/v1/pois?select=cat,name,lat,lng&lat=gte.'+s+'&lat=lte.'+nn+'&lng=gte.'+w+'&lng=lte.'+ee+'&cat=in.('+cats.join(',')+')&limit=500';
     setPoiStatus('טוען נקודות עניין…');
-    const errs=[];
-    for(let i=0;i<OVERPASS.length;i++){
-      const host=(OVERPASS[i].split('/')[2].split('.')[1]||'ep');
-      let timedOut=false;
-      try{
-        const ac=new AbortController(); const to=setTimeout(()=>{timedOut=true;ac.abort();},18000);
-        const r=await fetch(OVERPASS[i]+'?data='+encodeURIComponent(q),{signal:ac.signal}); clearTimeout(to);
-        if(!r.ok){ errs.push(host+':HTTP'+r.status); continue; }
-        const txt=await r.text(); let j;
-        try{ j=JSON.parse(txt); }catch(pe){ errs.push(host+':תגובה-לא-JSON'); continue; }
-        lastPoiKey=key; renderPois(j.elements||[]); return;
-      }catch(e){ errs.push(host+':'+(timedOut?'timeout':(e.message||'fail').slice(0,22))); }
-    }
-    setPoiStatus('נכשל — '+errs.join(' · '));
+    try{
+      const r=await fetch(url,{headers:{apikey:SB_KEY}});
+      if(!r.ok){ setPoiStatus('שגיאה '+r.status+' — האם הרצת מיגרציה 0006_pois?'); return; }
+      lastPoiKey=key; renderPois(await r.json());
+    }catch(e){ setPoiStatus('שגיאת רשת: '+(e.message||'').slice(0,30)); }
   }
-  function renderPois(els){
+  function renderPois(rows){
     poiLayer.clearLayers(); let n=0;
-    els.forEach(el=>{
-      const lat=el.lat!=null?el.lat:(el.center&&el.center.lat), lng=el.lon!=null?el.lon:(el.center&&el.center.lon);
-      if(lat==null)return; const tags=el.tags||{}; let def=null;
-      for(const d of POI_DEFS){ const[k,v]=d.k.split('='); if(tags[k]===v){def=d;break;} } if(!def)return; n++;
-      const name=tags['name:he']||tags.name||def.label;
-      let extra=''; if(tags.wikipedia){ const w=tags.wikipedia,t2=w.includes(':')?w.split(':').slice(1).join(':'):w; extra+='<br><a href="https://he.wikipedia.org/wiki/'+encodeURIComponent(t2)+'" target="_blank">ויקיפדיה ↗</a>'; }
-      extra+='<br><a href="https://www.openstreetmap.org/'+el.type+'/'+el.id+'" target="_blank">OSM ↗</a>';
-      const html='<div class="poi-pop"><b>'+name+'</b><span>'+def.icon+' '+def.label+'</span>'+extra+'<br><button class="poi-route-btn" data-lng="'+lng+'" data-lat="'+lat+'">🧭 נווט לכאן</button></div>';
-      const m=L.marker([lat,lng],{icon:emojiIcon(def.icon,22)}).bindPopup(html);
+    (rows||[]).forEach(p=>{
+      const def=POI_BYCAT[p.cat]; if(!def||p.lat==null||p.lng==null)return; n++;
+      const name=(p.name||def.label).replace(/</g,'&lt;');
+      const html='<div class="poi-pop"><b>'+name+'</b><span>'+def.icon+' '+def.label+'</span><br><button class="poi-route-btn" data-lng="'+p.lng+'" data-lat="'+p.lat+'">🧭 נווט לכאן</button></div>';
+      const m=L.marker([p.lat,p.lng],{icon:emojiIcon(def.icon,22)}).bindPopup(html);
       m.on('popupopen',ev=>{ const btn=ev.popup.getElement().querySelector('.poi-route-btn'); if(btn)btn.onclick=()=>{ setDestination([+btn.dataset.lng,+btn.dataset.lat]); m.closePopup(); }; });
       poiLayer.addLayer(m);
     });
-    setPoiStatus('נמצאו '+n+' נקודות עניין');
+    setPoiStatus(n?('נמצאו '+n+' נקודות עניין'):'אין נקודות באזור זה');
   }
   document.getElementById('poiBtn').onclick=e=>{ poiOn=!poiOn; e.currentTarget.classList.toggle('active',poiOn); if(poiOn)loadPois(true); else { poiLayer.clearLayers(); setPoiStatus(''); } };
 
