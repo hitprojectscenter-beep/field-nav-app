@@ -355,8 +355,8 @@
     setPoiStatus('טוען נקודות עניין…');
     for(let i=0;i<OVERPASS.length;i++){
       try{
-        const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),12000);
-        const r=await fetch(OVERPASS[i],{method:'POST',body:q,signal:ac.signal}); clearTimeout(to);
+        const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),15000);
+        const r=await fetch(OVERPASS[i]+'?data='+encodeURIComponent(q),{signal:ac.signal}); clearTimeout(to);  // GET (POST נחסם ברשתות מסוימות)
         if(!r.ok) continue;
         const j=JSON.parse(await r.text()); lastPoiKey=key; renderPois(j.elements||[]); return;
       }catch(e){}
