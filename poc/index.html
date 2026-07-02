@@ -356,15 +356,20 @@
     const clauses=Object.keys(byKey).map(k=>'nwr["'+k+'"~"^('+byKey[k].join('|')+')$"]('+bbox+');').join('');
     const q='[out:json][timeout:25];('+clauses+');out center 60;';
     setPoiStatus('טוען נקודות עניין…');
+    const errs=[];
     for(let i=0;i<OVERPASS.length;i++){
+      const host=(OVERPASS[i].split('/')[2].split('.')[1]||'ep');
+      let timedOut=false;
       try{
-        const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),18000);
+        const ac=new AbortController(); const to=setTimeout(()=>{timedOut=true;ac.abort();},18000);
         const r=await fetch(OVERPASS[i]+'?data='+encodeURIComponent(q),{signal:ac.signal}); clearTimeout(to);
-        if(!r.ok) continue;
-        const j=JSON.parse(await r.text()); lastPoiKey=key; renderPois(j.elements||[]); return;
-      }catch(e){}
+        if(!r.ok){ errs.push(host+':HTTP'+r.status); continue; }
+        const txt=await r.text(); let j;
+        try{ j=JSON.parse(txt); }catch(pe){ errs.push(host+':תגובה-לא-JSON'); continue; }
+        lastPoiKey=key; renderPois(j.elements||[]); return;
+      }catch(e){ errs.push(host+':'+(timedOut?'timeout':(e.message||'fail').slice(0,22))); }
     }
-    setPoiStatus('שרת עמוס — לחצו 🏞️ לניסיון חוזר');
+    setPoiStatus('נכשל — '+errs.join(' · '));
   }
   function renderPois(els){
     poiLayer.clearLayers(); let n=0;
