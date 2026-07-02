@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>טיול של מארק · ניווט שטח לישראל</title>
+<meta name="description" content="טיול של מארק — יישום ניווט שטח חכם לישראל: מסלולים לרכב ו-4X4, אלפי נקודות עניין, מעקב GPS, טיולים קבוצתיים, תבליט 3D ועוד. מבוסס מקורות פתוחים." />
+<meta property="og:title" content="טיול של מארק · ניווט שטח לישראל" />
+<meta property="og:description" content="מסלולי שטח, אלפי נקודות עניין, מעקב GPS וטיולים קבוצתיים — במפה אחת." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1512; --card:rgba(255,255,255,0.055); --edge:rgba(255,255,255,0.10);
+    --text:#eef1ee; --muted:#9fb0a6;
+    --accent:#e07a2e; --accent2:#4f9d6b; --accent3:#f0b429;
+    --radius:22px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Heebo',system-ui,sans-serif; color:var(--text); background:var(--bg);
+    overflow-x:hidden; line-height:1.6;
+  }
+  /* רקע דקורטיבי — קווי גובה + זוהר */
+  .bgfx{position:fixed; inset:0; z-index:-1; overflow:hidden;}
+  .bgfx .glow{position:absolute; border-radius:50%; filter:blur(90px); opacity:.5;}
+  .bgfx .g1{width:520px;height:520px; background:#c2551c; top:-160px; right:-120px;}
+  .bgfx .g2{width:480px;height:480px; background:#2f6b47; bottom:-180px; left:-140px;}
+  .bgfx .g3{width:360px;height:360px; background:#8a5a12; top:40%; left:55%;}
+  .bgfx svg{position:absolute; inset:0; width:100%; height:100%; opacity:.08;}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 22px;}
+
+  /* כותרת עליונה */
+  header{display:flex; align-items:center; justify-content:space-between; padding:22px 0;}
+  .brand{display:flex; align-items:center; gap:12px; font-weight:900; font-size:20px;}
+  .brand .logo{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 22px rgba(224,122,46,.35);}
+  .brand small{display:block;font-weight:600;font-size:12px;color:var(--muted);}
+  .nav-cta{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#fff;font-weight:800;font-size:15px;
+    padding:11px 20px;border-radius:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 8px 22px rgba(224,122,46,.35); transition:transform .15s;}
+  .nav-cta:hover{transform:translateY(-2px);}
+
+  /* הירו */
+  .hero{text-align:center; padding:64px 0 46px;}
+  .badge{display:inline-block;padding:7px 16px;border-radius:30px;background:var(--card);border:1px solid var(--edge);
+    color:var(--accent3);font-weight:700;font-size:13.5px;margin-bottom:22px;}
+  .hero h1{font-size:clamp(34px,6vw,60px);font-weight:900;line-height:1.12;letter-spacing:-.5px;}
+  .hero h1 .hl{background:linear-gradient(120deg,var(--accent),var(--accent3),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero p{max-width:620px;margin:20px auto 0;font-size:clamp(16px,2.4vw,20px);color:var(--muted);}
+  .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:34px;}
+  .btn{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-size:17px;
+    padding:15px 30px;border-radius:32px;transition:transform .15s, box-shadow .2s;}
+  .btn.primary{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 12px 30px rgba(224,122,46,.4);}
+  .btn.primary:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(224,122,46,.5);}
+  .btn.ghost{color:var(--text);background:var(--card);border:1px solid var(--edge);}
+  .btn.ghost:hover{transform:translateY(-3px);}
+
+  .stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:44px;}
+  .stat{background:var(--card);border:1px solid var(--edge);border-radius:18px;padding:16px 24px;min-width:150px;}
+  .stat b{display:block;font-size:26px;font-weight:900;color:var(--accent3);}
+  .stat span{font-size:13px;color:var(--muted);font-weight:600;}
+
+  /* פיצ'רים */
+  section.features{padding:40px 0 20px;}
+  .sec-title{text-align:center;margin-bottom:36px;}
+  .sec-title h2{font-size:clamp(26px,4vw,38px);font-weight:900;}
+  .sec-title p{color:var(--muted);margin-top:8px;font-size:16px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;}
+  .card{background:var(--card);border:1px solid var(--edge);border-radius:var(--radius);padding:26px;
+    backdrop-filter:blur(10px);transition:transform .18s, border-color .2s, background .2s;}
+  .card:hover{transform:translateY(-5px);border-color:rgba(224,122,46,.5);background:rgba(255,255,255,.08);}
+  .card .ic{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;font-size:28px;margin-bottom:16px;
+    background:linear-gradient(135deg,rgba(224,122,46,.22),rgba(79,157,107,.22));border:1px solid var(--edge);}
+  .card h3{font-size:20px;font-weight:800;margin-bottom:7px;}
+  .card p{color:var(--muted);font-size:15px;}
+
+  /* פס תחתון */
+  .final{margin:56px 0;text-align:center;background:linear-gradient(135deg,rgba(224,122,46,.14),rgba(79,157,107,.14));
+    border:1px solid var(--edge);border-radius:var(--radius);padding:48px 26px;}
+  .final h2{font-size:clamp(24px,4vw,34px);font-weight:900;}
+  .final p{color:var(--muted);margin:12px auto 26px;max-width:520px;}
+
+  footer{border-top:1px solid var(--edge);padding:26px 0 40px;text-align:center;color:var(--muted);font-size:13.5px;}
+  footer a{color:var(--accent3);text-decoration:none;}
+  footer .langs{margin-top:8px;font-size:18px;letter-spacing:4px;}
+</style>
+</head>
+<body>
+  <div class="bgfx">
+    <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice">
+      <g fill="none" stroke="#ffffff" stroke-width="1.4">
+        <path d="M-20,120 C200,60 380,180 560,120 S900,60 1020,140"/>
+        <path d="M-20,200 C200,150 380,260 560,200 S900,150 1020,220"/>
+        <path d="M-20,300 C220,240 400,360 600,300 S920,250 1020,320"/>
+        <path d="M-20,400 C220,340 400,460 600,400 S920,350 1020,420"/>
+        <path d="M-20,500 C220,450 400,560 600,500 S920,460 1020,520"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">🧭</div>
+        <div>טיול של מארק<small>ניווט שטח לישראל</small></div>
+      </div>
+      <a class="nav-cta" href="index.html">🗺️ פתיחת היישום</a>
+    </header>
+
+    <section class="hero">
+      <span class="badge">🆓 חינמי · מבוסס מקורות פתוחים (OpenStreetMap)</span>
+      <h1>מגלים את השטח,<br><span class="hl">בלי ללכת לאיבוד.</span></h1>
+      <p>יישום ניווט שטח חכם לישראל — מסלולים לרכב ו-4X4, אלפי נקודות עניין, מעקב GPS חי, טיולים קבוצתיים ותבליט תלת-ממד. הכול במפה אחת, בדפדפן, ללא התקנה.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="index.html">🗺️ בואו נצא לדרך</a>
+        <a class="btn ghost" href="#features">מה יש ביישום?</a>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>11,500+</b><span>נקודות עניין בישראל</span></div>
+        <div class="stat"><b>3</b><span>סוגי ניווט (רכב/4X4/רגלי)</span></div>
+        <div class="stat"><b>5</b><span>שפות ממשק</span></div>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <div class="sec-title">
+        <h2>כל מה שצריך ליום בשטח</h2>
+        <p>כלים מקצועיים בממשק פשוט ומזמין</p>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="ic">🗺️</div><h3>מפה מתקדמת</h3><p>שבילים מסומנים, מפה טופוגרפית, צילום אוויר, הצללת תבליט וקווי גובה עם ערכי הגובה.</p></div>
+        <div class="card"><div class="ic">🛣️</div><h3>ניווט שטח ליעד</h3><p>מסלול מהמיקום שלכם ליעד שבחרתם — לרכב רגיל או 4X4 — עם מרחק וזמן הגעה משוער.</p></div>
+        <div class="card"><div class="ic">🏞️</div><h3>אלפי נקודות עניין</h3><p>מעיינות, עתיקות, מערות, תצפיות, מפלים, חניוני לילה ומנזרים — נטענים מיד לפי האזור שאתם צופים בו.</p></div>
+        <div class="card"><div class="ic">📍</div><h3>מעקב GPS חי</h3><p>"הצג אותי" על המפה, הקלטת מסלול הנסיעה, וייצוא לקובץ GPX לשיתוף עם אחרים.</p></div>
+        <div class="card"><div class="ic">👥</div><h3>טיולים קבוצתיים</h3><p>יזמו טיול, הזמינו חברים, נהלו צ'אט ייעודי לטיול, וראו זה את זה על המפה בזמן אמת.</p></div>
+        <div class="card"><div class="ic">📷</div><h3>תמונות למיקום</h3><p>צלמו לאורך המסלול והתמונה תיצמד אוטומטית למיקום הגאוגרפי שלה על המפה.</p></div>
+        <div class="card"><div class="ic">📏</div><h3>כלי מדידה וניווט</h3><p>מדידת מרחק ושטח, סימון נקודה עם קואורדינטות, וקרן אווירית קבועה ליעד.</p></div>
+        <div class="card"><div class="ic">🖨️</div><h3>הדפסת מסלול</h3><p>הדפיסו את המפה עם המסלול, קנה מידה, רוח צפון והערות — לניווט גם בלי סוללה.</p></div>
+        <div class="card"><div class="ic">🌐</div><h3>רב-לשוני</h3><p>ממשק בעברית, אנגלית, צרפתית, ספרדית ורוסית — עם החלפת כיוון כתיבה אוטומטית.</p></div>
+      </div>
+    </section>
+
+    <section class="final">
+      <h2>מוכנים לצאת לשטח?</h2>
+      <p>נפתח בדפדפן, ללא התקנה וללא עלות. עובד גם מהטלפון בשטח.</p>
+      <a class="btn primary" href="index.html">🧭 פתחו את טיול של מארק</a>
+    </section>
+
+    <footer>
+      מפות ונתונים: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a> · Israel Hiking Map · Esri · מסלולים: BRouter · תבליט: AWS Terrain
+      <div class="langs">🇮🇱 🇬🇧 🇫🇷 🇪🇸 🇷🇺</div>
+      <div style="margin-top:10px">טיול של מארק — נבנה באהבה למרחבים הפתוחים של ישראל 🏜️</div>
+    </footer>
+  </div>
+</body>
+</html>
