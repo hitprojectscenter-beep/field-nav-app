@@ -24,7 +24,7 @@
     .brand{ pointer-events:auto; display:flex; align-items:center; gap:10px; padding:9px 15px; border-radius:var(--radius); font-weight:700; font-size:15px; }
     .brand .logo{ width:29px; height:29px; border-radius:9px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:grid; place-items:center; color:#fff; font-size:16px; }
     .brand small{ font-weight:500; color:var(--muted); font-size:11px; }
-    .top-actions{ pointer-events:auto; display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; max-width:66%; }
+    .top-actions{ position:relative; pointer-events:auto; display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; max-width:74%; }
     .icon-btn{ width:44px; height:44px; border:none; cursor:pointer; border-radius:13px; font-size:19px; display:grid; place-items:center; color:var(--text); transition:transform .12s, background .2s; }
     .icon-btn:active{ transform:scale(.93); }
     .icon-btn.active{ background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; }
@@ -53,7 +53,8 @@
     .route-chip{ border-right-color:#c2682a; } .nav-chip{ border-right-color:#2e9e3f; } .measure-chip{ border-right-color:#1f6fd1; } .track-chip{ border-right-color:#8e44ad; }
     .poi-status{ position:absolute; bottom:78px; left:50%; transform:translateX(-50%); z-index:500; display:none; padding:5px 12px; border-radius:12px; color:var(--muted); font-size:12px; font-weight:600; }
 
-    .tool-dock{ position:absolute; top:132px; right:14px; z-index:500; display:flex; flex-direction:column; gap:6px; padding:8px; border-radius:20px; }
+    .tool-dock{ position:absolute; top:120px; right:14px; z-index:600; display:none; flex-direction:column; gap:6px; padding:8px; border-radius:20px; }
+    .tool-dock.open{ display:flex; }
     .tool-btn{ width:44px; height:44px; border:none; cursor:pointer; background:transparent; color:var(--text); border-radius:13px; font-size:19px; display:grid; place-items:center; transition:transform .12s, background .2s; }
     .tool-btn:active{ transform:scale(.92); }
     .tool-btn.on{ background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; }
@@ -63,7 +64,16 @@
     .rec-fab{ bottom:122px; } .rec-fab.on{ background:linear-gradient(135deg,#e53935,#b71c1c); color:#fff; animation:recPulse 1.4s infinite; }
     @keyframes recPulse{ 0%,100%{box-shadow:var(--shadow)} 50%{box-shadow:0 0 0 7px rgba(229,57,53,.28)} }
 
-    .layers{ position:absolute; bottom:14px; left:14px; z-index:500; border-radius:var(--radius); padding:8px; display:flex; flex-direction:column; gap:5px; max-height:calc(100vh - 120px); overflow:auto; }
+    .layers{ position:absolute; bottom:14px; left:14px; z-index:600; border-radius:var(--radius); padding:8px; display:none; flex-direction:column; gap:5px; max-height:calc(100vh - 110px); overflow:auto; width:min(240px,72vw); }
+    .layers.open{ display:flex; }
+    /* תפריט פעולות עליון נגלל */
+    .top-menu{ display:none; position:absolute; top:52px; left:0; flex-direction:row; flex-wrap:wrap; gap:7px; padding:9px; max-width:min(300px,86vw);
+      background:var(--panel); backdrop-filter:var(--panel-blur); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--shadow); }
+    .top-menu.open{ display:flex; }
+    /* כפתורי מיקום/הקלטה קומפקטיים (אייקון בלבד) */
+    .showme-fab .tx{ display:none; }
+    .showme-fab{ width:48px; height:48px; padding:0; justify-content:center; border-radius:15px; }
+    .showme-fab .ic{ font-size:22px; }
     .layer-chip{ border:none; cursor:pointer; text-align:start; background:transparent; color:var(--text); padding:8px 13px; border-radius:11px; font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:9px; }
     .layer-chip.active{ background:var(--accent); color:#fff; }
     .layer-chip .dot{ font-size:15px; }
@@ -136,14 +146,19 @@
     <div class="brand"><div class="logo">🧭</div><div><span id="brandName">טיול של מארק</span> <small id="brandTag">· ניווט שטח</small></div></div>
     <div class="top-actions">
       <button class="icon-btn" id="searchBtn" title="חיפוש מקום">🔎</button>
-      <button class="icon-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
-      <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
       <button class="icon-btn" id="poiBtn" title="נקודות עניין">🏞️</button>
-      <button class="icon-btn" id="photoBtn" title="צלם / צרף תמונה">📷</button>
-      <button class="icon-btn" id="importRouteBtn" title="ייבוא מסלול (GPX/KML)">📂</button>
-      <button class="icon-btn" id="printBtn" title="הדפסת מסלול">🖨️</button>
-      <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
-      <button class="icon-btn" id="langBtn" title="Language / שפה">🌐</button>
+      <button class="icon-btn" id="layersBtn" title="שכבות רקע, תבליט וסינון">🗂️</button>
+      <button class="icon-btn" id="toolsBtn" title="כלי מדידה וניווט">🧰</button>
+      <button class="icon-btn" id="menuBtn" title="תפריט">☰</button>
+      <div class="top-menu" id="topMenu">
+        <button class="icon-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
+        <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
+        <button class="icon-btn" id="photoBtn" title="צלם / צרף תמונה">📷</button>
+        <button class="icon-btn" id="importRouteBtn" title="ייבוא מסלול (GPX/KML)">📂</button>
+        <button class="icon-btn" id="printBtn" title="הדפסת מסלול">🖨️</button>
+        <button class="icon-btn" id="themeBtn" title="יום / לילה">🌙</button>
+        <button class="icon-btn" id="langBtn" title="Language / שפה">🌐</button>
+      </div>
       <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" />
       <input type="file" accept=".gpx,.kml,text/xml" id="routeInput" style="display:none" />
     </div>
@@ -542,6 +557,15 @@
   document.getElementById('langBtn').onclick=e=>{ e.stopPropagation(); document.getElementById('langMenu').classList.toggle('open'); };
   document.querySelectorAll('.lang-menu button').forEach(b=>b.onclick=()=>setLang(b.dataset.lang));
   document.addEventListener('click',e=>{ const m=document.getElementById('langMenu'); if(m.classList.contains('open')&&!m.contains(e.target)&&e.target.id!=='langBtn')m.classList.remove('open'); });
+
+  // ===== כפתורי פתיחה/סגירה של פאנלים (מובייל — הכול מוסתר כברירת מחדל) =====
+  const _layersP=document.getElementById('layers'), _toolsP=document.querySelector('.tool-dock'), _topM=document.getElementById('topMenu');
+  const _lBtn=document.getElementById('layersBtn'), _tBtn=document.getElementById('toolsBtn'), _mBtn=document.getElementById('menuBtn');
+  _lBtn.onclick=e=>{ e.stopPropagation(); const o=_layersP.classList.toggle('open'); _lBtn.classList.toggle('active',o); _toolsP.classList.remove('open'); _tBtn.classList.remove('active'); };
+  _tBtn.onclick=e=>{ e.stopPropagation(); const o=_toolsP.classList.toggle('open'); _tBtn.classList.toggle('active',o); _layersP.classList.remove('open'); _lBtn.classList.remove('active'); };
+  _mBtn.onclick=e=>{ e.stopPropagation(); const o=_topM.classList.toggle('open'); _mBtn.classList.toggle('active',o); };
+  document.addEventListener('click',e=>{ if(_topM.classList.contains('open')&&!_topM.contains(e.target)&&e.target!==_mBtn){ _topM.classList.remove('open'); _mBtn.classList.remove('active'); } });
+  map.on('movestart',()=>{ _topM.classList.remove('open'); _mBtn.classList.remove('active'); });
 
   // ================== בניית פאנל השכבות ==================
   const layersEl=document.getElementById('layers');
