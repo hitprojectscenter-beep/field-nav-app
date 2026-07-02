@@ -382,7 +382,7 @@
       <button class="icon-btn" id="searchBtn" title="חיפוש מקום">🔎</button>
       <button class="icon-btn account-btn" id="accountBtn" title="חשבון / הרשמה">👤</button>
       <button class="icon-btn" id="tripsBtn" title="טיולים קבוצתיים">👥</button>
-      <button class="icon-btn active" id="poiBtn" title="נקודות עניין: עתיקות, מעיינות, מערות, תצפיות, קפה">🏞️</button>
+      <button class="icon-btn" id="poiBtn" title="נקודות עניין: עתיקות, מעיינות, מערות, תצפיות, קפה">🏞️</button>
       <button class="icon-btn" id="photoBtn" title="צלם / צרף תמונה למיקום">📷</button>
       <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" />
       <button class="icon-btn" id="legendBtn" title="מקרא">📖</button>
@@ -516,7 +516,7 @@
     let CONTOUR_URL = null;
     try{
       if(window.mlcontour){
-        const demSrc = new mlcontour.DemSource({ url: DEM_URL, encoding:'terrarium', maxzoom:13, worker:true });
+        const demSrc = new mlcontour.DemSource({ url: DEM_URL, encoding:'terrarium', maxzoom:13, worker:false });
         demSrc.setupMaplibre(maplibregl);
         DEM_URL = demSrc.sharedDemProtocolUrl;
         CONTOUR_URL = demSrc.contourProtocolUrl({ thresholds:{11:[50,250],12:[25,100],13:[20,100],14:[10,50],15:[5,25]}, contourLayer:'contours', elevationKey:'ele', levelKey:'level' });
@@ -675,7 +675,15 @@
       if(window.__reapplySaved) window.__reapplySaved();
     }
     map.on('load', addExtras);
-    map.on('error', e => { console.warn('MapLibre error:', e && e.error && e.error.message); });
+    map.on('error', e => {
+      const m = (e && e.error && e.error.message) || 'map error';
+      console.warn('MapLibre error:', m);
+      if(/contour|dem|elevation|terrarium/i.test(m)){
+        let b=document.getElementById('__errbox');
+        if(!b){ b=document.createElement('div'); b.id='__errbox'; b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b71c1c;color:#fff;font:12px monospace;padding:8px;max-height:40vh;overflow:auto;direction:ltr'; (document.body||document.documentElement).appendChild(b); }
+        const d=document.createElement('div'); d.textContent='⚠ קווי גובה: '+m; b.appendChild(d);
+      }
+    });
 
     // ===== בורר שכבות =====
     let current = "hiking";
@@ -852,7 +860,7 @@
     // R2 — בחירת יעד וניתוב שטח אמיתי (BRouter) | R3 — נקודות עניין אמיתיות (OSM/Overpass)
     // ========================================================================
     let startPoint = null, destPoint = null, destMarker = null;
-    let poiMarkers = [], poiOn = true;
+    let poiMarkers = [], poiOn = false;   // כבוי כברירת מחדל — נדלק בלחיצה על 🏞️
     const activePoiGroups = new Set(['water','nature','heritage','tour']);   // סינון קטגוריות POI
     let lastRouteData = { type:"FeatureCollection", features:[] };
     // שכבת המסלול מוגדרת בתוך הסגנון (styleFor) ולכן תמיד קיימת — רק מעדכנים נתונים.
