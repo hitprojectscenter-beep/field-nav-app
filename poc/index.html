@@ -48,6 +48,7 @@
     .hint{ padding:7px 14px; border-radius:14px; color:var(--muted); font-size:12.5px; font-weight:600; }
     .chip{ display:none; align-items:center; gap:8px; padding:8px 8px 8px 14px; border-radius:14px; font-weight:700; font-size:13px; border-right:4px solid var(--accent); }
     .chip-x{ border:none; background:rgba(128,128,128,.16); color:var(--text); border-radius:9px; width:26px; height:26px; cursor:pointer; font-size:13px; flex:0 0 26px; }
+    .chip-x.veh.on{ background:var(--accent-2); color:#fff; }
     .chip-x.del{ background:rgba(210,59,59,.16); }
     .route-chip{ border-right-color:#c2682a; } .nav-chip{ border-right-color:#2e9e3f; } .measure-chip{ border-right-color:#1f6fd1; } .track-chip{ border-right-color:#8e44ad; }
     .poi-status{ position:absolute; bottom:78px; left:50%; transform:translateX(-50%); z-index:500; display:none; padding:5px 12px; border-radius:12px; color:var(--muted); font-size:12px; font-weight:600; }
@@ -160,7 +161,7 @@
 
   <div class="info-stack">
     <div class="hint" id="hint">👆 הקישו על המפה ליעד ← מסלול שטח · 🔎 חיפוש · 🏞️ נקודות עניין</div>
-    <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x" id="shareRouteBtn" title="שתף">🔗</button><button class="chip-x" id="routeGpxBtn" title="GPX">⬇️</button><button class="chip-x del" id="clearRouteBtn">✕</button></div>
+    <div class="chip route-chip" id="routeInfo"><span></span><button class="chip-x veh" id="vehCarBtn" title="רכב רגיל">🚗</button><button class="chip-x veh" id="veh4x4Btn" title="רכב שטח 4X4">🚙</button><button class="chip-x" id="shareRouteBtn" title="שתף">🔗</button><button class="chip-x" id="routeGpxBtn" title="GPX">⬇️</button><button class="chip-x del" id="clearRouteBtn">✕</button></div>
     <div class="chip nav-chip" id="navInfo"><span></span><button class="chip-x" id="cancelNavBtn">✕</button></div>
     <div class="chip measure-chip" id="measureInfo"><span></span><button class="chip-x" id="undoMeasureBtn">↶</button><button class="chip-x del" id="clearMeasureBtn">🗑️</button></div>
     <div class="chip track-chip" id="trackInfo"><span></span><button class="chip-x" id="trackGpxBtn">⬇️</button><button class="chip-x" id="trackSaveBtn">💾</button><button class="chip-x del" id="trackClearBtn">🗑️</button></div>
@@ -295,18 +296,36 @@
 
   // ================== R2 מסלול (BRouter) ==================
   let startPoint=null, destPoint=null, destMarker=null, routeLayer=null, lastRouteCoords=[];
+  let lastRouteStart=null, lastRouteDest=null, curVehicle='car';
+  const VEH={ car:{prof:'car-fast',icon:'🚗',label:'רכב רגיל',kmh:55}, '4x4':{prof:'car-eco',icon:'🚙',label:'4X4',kmh:32} };
+  function fmtEta(s){ s=Math.round(s); const h=Math.floor(s/3600), m=Math.round((s%3600)/60); return h?(h+' שע\' '+(m<10?'0':'')+m+' דק\''):(Math.max(1,m)+' דק\''); }
   function drawRoute(coords){ if(routeLayer) map.removeLayer(routeLayer); lastRouteCoords=coords; routeLayer=L.polyline(coords.map(c=>[c[1],c[0]]),{color:'#c2682a',weight:5,opacity:.92}).addTo(map); }
-  async function routeTo(start,dest){
+  async function routeTo(start,dest,vehicle){
+    if(vehicle) curVehicle=vehicle;
+    lastRouteStart=start; lastRouteDest=dest;
+    document.querySelectorAll('#routeInfo .veh').forEach(b=>b.classList.toggle('on', b.id===(curVehicle==='4x4'?'veh4x4Btn':'vehCarBtn')));
+    const v=VEH[curVehicle];
     chip('routeInfo','מחשב מסלול…',true);
-    const url='https://brouter.de/brouter?lonlats='+start[0].toFixed(5)+','+start[1].toFixed(5)+'|'+dest[0].toFixed(5)+','+dest[1].toFixed(5)+'&profile='+routeProfile+'&alternativeidx=0&format=geojson';
+    const url='https://brouter.de/brouter?lonlats='+start[0].toFixed(5)+','+start[1].toFixed(5)+'|'+dest[0].toFixed(5)+','+dest[1].toFixed(5)+'&profile='+v.prof+'&alternativeidx=0&format=geojson';
     try{
       const j=await (await fetch(url)).json();
       if(!j.features||!j.features.length){ chip('routeInfo','לא נמצא מסלול',true); return; }
       const co=j.features[0].geometry.coordinates; drawRoute(co);
-      const km=(j.features[0].properties['track-length']/1000).toFixed(1);
-      chip('routeInfo','מסלול שטח · '+km+' ק"מ',true);
+      const props=j.features[0].properties||{};
+      const km=props['track-length']/1000;
+      let secs=+props['total-time']; if(!secs||isNaN(secs)) secs=km/v.kmh*3600;
+      chip('routeInfo', v.icon+' '+v.label+' · '+km.toFixed(1)+' ק"מ · ⏱ ~'+fmtEta(secs),true);
       map.fitBounds(routeLayer.getBounds(),{padding:[50,50],maxZoom:15});
     }catch(e){ chip('routeInfo','שגיאה בחישוב מסלול',true); }
+  }
+  // נווט לכאן: מסלול מהמיקום שלי (GPS) ליעד + זמן הגעה + בחירת רכב
+  function navigateHere(lng,lat){
+    const dest=[lng,lat];
+    if(destMarker)map.removeLayer(destMarker); destMarker=L.marker([lat,lng],{icon:emojiIcon('🚩',26)}).addTo(map); destPoint=dest;
+    const go=from=>routeTo(from,dest,curVehicle);
+    if(window.__myPos) go(window.__myPos);
+    else if(navigator.geolocation){ chip('routeInfo','📍 מאתר את מיקומך…',true); navigator.geolocation.getCurrentPosition(p=>{ window.__myPos=[p.coords.longitude,p.coords.latitude]; go(window.__myPos); }, e=>{ chip('routeInfo','⚠ לא ניתן לאתר מיקום — מנווט ממרכז המפה',true); go([map.getCenter().lng,map.getCenter().lat]); }, {enableHighAccuracy:true,timeout:10000,maximumAge:30000}); }
+    else go([map.getCenter().lng,map.getCenter().lat]);
   }
   let startMarker=null;
   function setStart(ll){ startPoint=ll; if(startMarker)map.removeLayer(startMarker); startMarker=L.marker([ll[1],ll[0]],{icon:emojiIcon('🟢',20)}).addTo(map).bindTooltip('נקודת התחלה'); }
@@ -321,6 +340,8 @@
     else { setStart(ll); chip('routeInfo','✅ התחלה נבחרה — הקישו כעת על היעד',true); }
   }
   document.getElementById('clearRouteBtn').onclick=()=>{ if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;} if(destMarker){map.removeLayer(destMarker);destMarker=null;} if(startMarker){map.removeLayer(startMarker);startMarker=null;} if(geoWatch===null)startPoint=null; destPoint=null; lastRouteCoords=[]; chip('routeInfo','',false); };
+  document.getElementById('vehCarBtn').onclick=()=>{ if(lastRouteDest)routeTo(lastRouteStart,lastRouteDest,'car'); };
+  document.getElementById('veh4x4Btn').onclick=()=>{ if(lastRouteDest)routeTo(lastRouteStart,lastRouteDest,'4x4'); };
 
   // ================== R6 GPX ==================
   function routeGPX(){ const seg=lastRouteCoords.map(p=>'<trkpt lat="'+p[1]+'" lon="'+p[0]+'"></trkpt>').join(''); return '<?xml version="1.0"?>\n<gpx version="1.1" creator="field-nav-app" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>מסלול</name><trkseg>'+seg+'</trkseg></trk></gpx>'; }
@@ -369,7 +390,7 @@
       const name=(p.name||def.label).replace(/</g,'&lt;');
       const html='<div class="poi-pop"><b>'+name+'</b><span>'+def.icon+' '+def.label+'</span><br><button class="poi-route-btn" data-lng="'+p.lng+'" data-lat="'+p.lat+'">🧭 נווט לכאן</button></div>';
       const m=L.marker([p.lat,p.lng],{icon:emojiIcon(def.icon,22)}).bindPopup(html);
-      m.on('popupopen',ev=>{ const btn=ev.popup.getElement().querySelector('.poi-route-btn'); if(btn)btn.onclick=()=>{ setDestination([+btn.dataset.lng,+btn.dataset.lat]); m.closePopup(); }; });
+      m.on('popupopen',ev=>{ const btn=ev.popup.getElement().querySelector('.poi-route-btn'); if(btn)btn.onclick=()=>{ navigateHere(+btn.dataset.lng,+btn.dataset.lat); m.closePopup(); }; });
       poiLayer.addLayer(m);
     });
     setPoiStatus(n?('נמצאו '+n+' נקודות עניין'):'אין נקודות באזור זה');
@@ -510,7 +531,7 @@
       });
     }catch(e){ searchResults.innerHTML='<div class="res">שגיאת חיפוש</div>'; }
   }
-  function goToResult(lng,lat,name){ searchBar.classList.remove('open'); searchResults.innerHTML=''; map.setView([lat,lng],15); if(searchMarker)map.removeLayer(searchMarker); const html='<div class="poi-pop"><b>'+name+'</b><br><button class="poi-route-btn" data-lng="'+lng+'" data-lat="'+lat+'">🧭 נווט לכאן</button></div>'; searchMarker=L.marker([lat,lng],{icon:emojiIcon('📍',28)}).addTo(map).bindPopup(html).openPopup(); searchMarker.on('popupopen',ev=>{ const btn=ev.popup.getElement().querySelector('.poi-route-btn'); if(btn)btn.onclick=()=>{setDestination([+btn.dataset.lng,+btn.dataset.lat]);searchMarker.closePopup();}; }); }
+  function goToResult(lng,lat,name){ searchBar.classList.remove('open'); searchResults.innerHTML=''; map.setView([lat,lng],15); if(searchMarker)map.removeLayer(searchMarker); const html='<div class="poi-pop"><b>'+name+'</b><br><button class="poi-route-btn" data-lng="'+lng+'" data-lat="'+lat+'">🧭 נווט לכאן</button></div>'; searchMarker=L.marker([lat,lng],{icon:emojiIcon('📍',28)}).addTo(map).bindPopup(html).openPopup(); searchMarker.on('popupopen',ev=>{ const btn=ev.popup.getElement().querySelector('.poi-route-btn'); if(btn)btn.onclick=()=>{navigateHere(+btn.dataset.lng,+btn.dataset.lat);searchMarker.closePopup();}; }); }
 
   // ================== R7 הדפסה ==================
   document.getElementById('printBtn').onclick=()=>{ const notes=prompt('הערות להדפסה (רשות):','')||''; const km=lastRouteCoords.length?(function(){let d=0;for(let i=1;i<lastRouteCoords.length;i++)d+=haversine(lastRouteCoords[i-1],lastRouteCoords[i]);return 'אורך מסלול: '+fmtDist(d)+' · ';})():''; document.getElementById('printHeader').innerHTML='<span class="pn">▲ צפון</span>🧭 טיול של מארק — '+km+new Date().toLocaleString('he-IL')+(notes?' · הערות: '+notes.replace(/</g,'&lt;'):''); setTimeout(()=>window.print(),200); };
